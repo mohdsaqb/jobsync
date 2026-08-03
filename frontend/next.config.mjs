@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const backendUrl = process.env.BACKEND_URL ?? "http://localhost:4000";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: __dirname,
@@ -10,7 +12,7 @@ const nextConfig = {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:4000/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
       },
     ];
   },

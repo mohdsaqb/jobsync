@@ -6,7 +6,7 @@ import { ensureCollection } from "./services/milvus.service.js";
 
 const app = express();
 
-app.use(cors());
+app.use(cors(env.frontendOrigin ? { origin: env.frontendOrigin } : undefined));
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));

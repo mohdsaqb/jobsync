@@ -2,7 +2,7 @@ import { DataType, MetricType, MilvusClient } from "@zilliz/milvus2-sdk-node";
 import { env } from "../config/env.js";
 import type { JobDescription, JobMatch } from "../types/index.js";
 
-const client = new MilvusClient({ address: env.milvusAddress });
+const client = new MilvusClient({ address: env.milvusAddress, token: env.milvusToken });
 
 const FIELDS = {
   id: "id",
