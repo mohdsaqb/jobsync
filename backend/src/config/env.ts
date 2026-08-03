@@ -7,6 +7,6 @@ export const env = {
   milvusCollection: process.env.MILVUS_COLLECTION ?? "job_descriptions",
   embeddingModel: process.env.EMBEDDING_MODEL ?? "Xenova/all-MiniLM-L6-v2",
   embeddingDim: Number(process.env.EMBEDDING_DIM ?? 384),
-  topK: Number(process.env.TOP_K ?? 50),
+  topK: Number(process.env.TOP_K ?? 10000),
   frontendOrigin: process.env.FRONTEND_ORIGIN,
 };
