@@ -1,11 +1,81 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 import { getResumeSuggestions } from "@/lib/api";
 
 interface ResumeSuggestionsProps {
   resumeText: string;
+}
+
+/** Splits on **bold** markers and wraps the bold segments in <strong>. */
+function renderInline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i} className="font-semibold text-zinc-100">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      <Fragment key={i}>{part}</Fragment>
+    ),
+  );
+}
+
+/**
+ * Gemini's response is markdown-ish (numbered points with a bold lead-in
+ * followed by a body paragraph, occasional bullet lists). There's no
+ * markdown library in this project, and the shape is predictable enough
+ * that a small hand-rolled formatter reads better than raw text with
+ * literal "**" in it.
+ */
+function SuggestionsContent({ text }: { text: string }) {
+  const blocks = text.trim().split(/\n{2,}/);
+
+  return (
+    <div className="space-y-4">
+      {blocks.map((block, i) => {
+        const lines = block
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean);
+        const numberedMatch = lines[0]?.match(/^(\d+)\.\s+(.*)/);
+
+        if (numberedMatch) {
+          const [, number, heading] = numberedMatch;
+          const body = lines.slice(1).join(" ");
+          return (
+            <div key={i} className="flex gap-3">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-xs font-semibold text-indigo-300">
+                {number}
+              </span>
+              <div>
+                <p className="font-semibold text-zinc-100">{renderInline(heading)}</p>
+                {body && <p className="mt-1 leading-relaxed text-zinc-300">{renderInline(body)}</p>}
+              </div>
+            </div>
+          );
+        }
+
+        if (lines.every((line) => /^[-*]\s/.test(line))) {
+          return (
+            <ul key={i} className="list-disc space-y-1.5 pl-5 text-zinc-300">
+              {lines.map((line, j) => (
+                <li key={j} className="leading-relaxed">
+                  {renderInline(line.replace(/^[-*]\s/, ""))}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+
+        return (
+          <p key={i} className="leading-relaxed text-zinc-300">
+            {renderInline(lines.join(" "))}
+          </p>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function ResumeSuggestions({ resumeText }: ResumeSuggestionsProps) {
@@ -82,8 +152,8 @@ export default function ResumeSuggestions({ resumeText }: ResumeSuggestionsProps
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500">
             Suggestions for {suggestionsFor}
           </p>
-          <div className="whitespace-pre-line rounded-xl border border-white/10 bg-zinc-950/40 p-4 text-sm leading-relaxed text-zinc-300">
-            {suggestions}
+          <div className="rounded-xl border border-white/10 bg-zinc-950/40 p-4 text-sm sm:p-5">
+            <SuggestionsContent text={suggestions} />
           </div>
           <button
             type="button"

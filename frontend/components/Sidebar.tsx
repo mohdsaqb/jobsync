@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Briefcase, ChevronLeft, ChevronRight, UploadCloud } from "lucide-react";
+import { Briefcase, ChevronLeft, ChevronRight, Sparkles, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 const MIN_WIDTH = 76;
@@ -9,7 +9,7 @@ const MAX_WIDTH = 320;
 const DEFAULT_WIDTH = 264;
 const COLLAPSE_THRESHOLD = 170;
 
-type Screen = "upload" | "results";
+type Screen = "upload" | "results" | "suggestions";
 
 interface SidebarProps {
   screen: Screen;
@@ -61,6 +61,7 @@ export default function Sidebar({ screen, hasResults, onSelect }: SidebarProps) 
   const navItems = [
     { key: "upload" as const, label: "Upload resume", icon: UploadCloud, disabled: false },
     { key: "results" as const, label: "Job matches", icon: Briefcase, disabled: !hasResults },
+    { key: "suggestions" as const, label: "Improve resume", icon: Sparkles, disabled: !hasResults },
   ];
 
   return (

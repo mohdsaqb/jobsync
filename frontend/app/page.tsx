@@ -5,11 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import UploadPanel from "@/components/UploadPanel";
 import ResultsPanel from "@/components/ResultsPanel";
+import ResumeSuggestions from "@/components/ResumeSuggestions";
 import BackgroundGlow from "@/components/BackgroundGlow";
 import { analyzeResume } from "@/lib/api";
 import type { JobMatch } from "@/lib/types";
 
-type Screen = "upload" | "results";
+type Screen = "upload" | "results" | "suggestions";
 
 export default function Home() {
   const [screen, setScreen] = useState<Screen>("upload");
@@ -59,6 +60,17 @@ export default function Home() {
             >
               <UploadPanel onSubmit={handleUpload} loading={loading} error={error} />
             </motion.div>
+          ) : screen === "suggestions" ? (
+            <motion.div
+              key="suggestions"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              className="mx-auto max-w-3xl"
+            >
+              <ResumeSuggestions resumeText={resumeText} />
+            </motion.div>
           ) : (
             <motion.div
               key="results"
@@ -69,7 +81,6 @@ export default function Home() {
             >
               <ResultsPanel
                 matches={matches}
-                resumeText={resumeText}
                 visibleCount={visibleCount}
                 onLoadMore={() => setVisibleCount((c) => Math.min(c + 10, matches.length))}
                 onNewAnalysis={handleNewAnalysis}

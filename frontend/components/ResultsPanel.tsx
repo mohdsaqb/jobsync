@@ -5,12 +5,10 @@ import { motion } from "framer-motion";
 import { RotateCcw } from "lucide-react";
 import JobCard from "./JobCard";
 import JobDetailModal from "./JobDetailModal";
-import ResumeSuggestions from "./ResumeSuggestions";
 import type { JobMatch } from "@/lib/types";
 
 interface ResultsPanelProps {
   matches: JobMatch[];
-  resumeText: string;
   visibleCount: number;
   onLoadMore: () => void;
   onNewAnalysis: () => void;
@@ -18,7 +16,6 @@ interface ResultsPanelProps {
 
 export default function ResultsPanel({
   matches,
-  resumeText,
   visibleCount,
   onLoadMore,
   onNewAnalysis,
@@ -73,8 +70,6 @@ export default function ResultsPanel({
           <p className="text-sm text-zinc-500">You&apos;ve seen all {matches.length} matches.</p>
         )}
       </div>
-
-      <ResumeSuggestions resumeText={resumeText} />
 
       <JobDetailModal job={selectedJob} onClose={() => setSelectedJob(null)} />
     </div>
