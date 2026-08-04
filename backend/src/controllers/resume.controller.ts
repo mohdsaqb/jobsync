@@ -18,23 +18,7 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
   try {
     const text = await extractResumeText(file.path, file.mimetype);
     const embedding = await embedText(text);
-    console.log(
-      "[debug] embedding length:",
-      embedding.length,
-      "all-zero:",
-      embedding.every((v) => v === 0),
-      "sample:",
-      embedding.slice(0, 5),
-    );
     const matches = await searchJobs(embedding, env.topK);
-    console.log(
-      "[debug] topK:",
-      env.topK,
-      "raw match count:",
-      matches.length,
-      "top scores:",
-      matches.slice(0, 5).map((m) => m.score),
-    );
     const relevantMatches = matches.filter((match) => match.score > MIN_MATCH_SCORE);
 
     res.json({ matches: relevantMatches, resumeText: text });

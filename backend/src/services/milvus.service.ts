@@ -78,6 +78,11 @@ export async function countJobs(): Promise<number> {
   return Number(stats.data.row_count ?? 0);
 }
 
+// Zilliz Cloud serverless clusters cap the search `limit` parameter at 1024 —
+// exceeding it doesn't error, it silently returns zero hits. Clamping here
+// keeps TOP_K misconfiguration from ever causing that again.
+const MAX_SEARCH_LIMIT = 1024;
+
 /**
  * Runs a cosine-similarity search over the job_descriptions collection and
  * returns the top matches, best first.
@@ -86,7 +91,7 @@ export async function searchJobs(embedding: number[], topK = env.topK): Promise<
   const result = await client.search({
     collection_name: env.milvusCollection,
     data: embedding,
-    limit: topK,
+    limit: Math.min(topK, MAX_SEARCH_LIMIT),
     metric_type: MetricType.COSINE,
     output_fields: [FIELDS.jobId, FIELDS.title, FIELDS.company, FIELDS.description],
   });
