@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Building2, X } from "lucide-react";
 import type { JobMatch } from "@/lib/types";
-import { scoreTier } from "@/lib/scoreTier";
+import { matchPercent, scoreTier } from "@/lib/scoreTier";
 import { cn } from "@/lib/cn";
 
 interface JobDetailModalProps {
@@ -48,7 +48,7 @@ export default function JobDetailModal({ job, onClose }: JobDetailModalProps) {
   };
 
   const tier = job ? scoreTier(job.score) : null;
-  const percent = job ? Math.round(job.score * 100) : 0;
+  const percent = job ? matchPercent(job.score) : 0;
 
   return (
     <AnimatePresence>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bookmark, BookmarkCheck, Building2 } from "lucide-react";
 import type { JobMatch } from "@/lib/types";
-import { scoreTier } from "@/lib/scoreTier";
+import { matchPercent, scoreTier } from "@/lib/scoreTier";
 import { cn } from "@/lib/cn";
 
 interface JobCardProps {
@@ -15,7 +15,7 @@ export default function JobCard({ match, onOpen }: JobCardProps) {
   const [saved, setSaved] = useState(false);
   const [showApplyNote, setShowApplyNote] = useState(false);
   const storageKey = `resume-analyser:saved:${match.jobId}`;
-  const percent = Math.round(match.score * 100);
+  const percent = matchPercent(match.score);
   const tier = scoreTier(match.score);
 
   useEffect(() => {
