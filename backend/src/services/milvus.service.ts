@@ -2,7 +2,14 @@ import { DataType, MetricType, MilvusClient } from "@zilliz/milvus2-sdk-node";
 import { env } from "../config/env.js";
 import type { JobDescription, JobMatch } from "../types/index.js";
 
-const client = new MilvusClient({ address: env.milvusAddress, token: env.milvusToken });
+const client = new MilvusClient({
+  address: env.milvusAddress,
+  token: env.milvusToken,
+  // The SDK's default RPC deadline is 15s, which Zilliz Cloud's managed
+  // cluster (plus free-tier cold starts) can exceed on createCollection/
+  // createIndex/insert calls. 60s gives it enough room.
+  timeout: 60000,
+});
 
 const FIELDS = {
   id: "id",
