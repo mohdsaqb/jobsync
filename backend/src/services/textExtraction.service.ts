@@ -1,6 +1,5 @@
 import fs from "node:fs/promises";
-// pdf-parse ships as CommonJS with no default-export types; import the module namespace and call it directly.
-import pdfParse from "pdf-parse";
+import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { createWorker } from "tesseract.js";
 
 const MIN_TEXT_LENGTH = 30;
@@ -8,9 +7,17 @@ const MIN_TEXT_LENGTH = 30;
 export class TextExtractionError extends Error {}
 
 async function extractFromPdf(filePath: string): Promise<string> {
-  const buffer = await fs.readFile(filePath);
-  const result = await pdfParse(buffer);
-  return result.text.trim();
+  const data = new Uint8Array(await fs.readFile(filePath));
+  const doc = await getDocument({ data, useSystemFonts: true }).promise;
+
+  const pageTexts: string[] = [];
+  for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
+    const page = await doc.getPage(pageNum);
+    const content = await page.getTextContent();
+    pageTexts.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
+  }
+
+  return pageTexts.join("\n").trim();
 }
 
 async function extractFromImage(filePath: string): Promise<string> {
