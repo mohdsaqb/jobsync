@@ -26,6 +26,8 @@ const DELAY_MS = 1100;
 // postings broaden the same spread rather than skewing it.
 const QUERIES = [
   "software engineer", "frontend developer", "backend developer", "full stack engineer",
+  "MERN stack developer", "MEAN stack developer", "react developer", "node.js developer",
+  "javascript developer", "typescript developer", "web developer",
   "devops engineer", "site reliability engineer", "data engineer", "data scientist",
   "machine learning engineer", "cloud engineer", "network engineer", "database administrator",
   "qa engineer", "security analyst", "product manager", "business analyst",
