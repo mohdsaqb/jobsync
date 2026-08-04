@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seedJobs.ts",
     "seed:reset": "tsx src/scripts/seedJobs.ts --reset",
-    "generate:jobs": "tsx src/scripts/generateJobs.ts"
+    "generate:jobs": "tsx src/scripts/generateJobs.ts",
+    "fetch:adzuna": "tsx src/scripts/fetchAdzunaJobs.ts"
   },
   "dependencies": {
     "@google/genai": "^2.15.0",

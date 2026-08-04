@@ -18,7 +18,6 @@ export default function Home() {
   const [resumeText, setResumeText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = useState(10);
 
   const handleUpload = async (file: File) => {
     setLoading(true);
@@ -27,7 +26,6 @@ export default function Home() {
       const results = await analyzeResume(file);
       setMatches(results.matches);
       setResumeText(results.resumeText);
-      setVisibleCount(10);
       setScreen("results");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -40,7 +38,6 @@ export default function Home() {
     setMatches(null);
     setResumeText("");
     setError(null);
-    setVisibleCount(10);
     setScreen("upload");
   };
 
@@ -79,12 +76,7 @@ export default function Home() {
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25 }}
             >
-              <ResultsPanel
-                matches={matches}
-                visibleCount={visibleCount}
-                onLoadMore={() => setVisibleCount((c) => Math.min(c + 10, matches.length))}
-                onNewAnalysis={handleNewAnalysis}
-              />
+              <ResultsPanel matches={matches} onNewAnalysis={handleNewAnalysis} />
             </motion.div>
           )}
         </AnimatePresence>
