@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Briefcase, ChevronLeft, ChevronRight, Sparkles, UploadCloud } from "lucide-react";
 import { cn } from "@/lib/cn";
+import Logo from "@/components/Logo";
 
 const MIN_WIDTH = 76;
 const MAX_WIDTH = 320;
@@ -74,9 +75,12 @@ export default function Sidebar({ screen, hasResults, onSelect }: SidebarProps) 
     >
       <div className={cn("flex items-center px-4 py-5", collapsed && "justify-center px-0")}>
         {collapsed ? (
-          <span className="text-lg font-bold tracking-tight text-zinc-100">J</span>
+          <Logo className="h-7 w-7" />
         ) : (
-          <span className="whitespace-nowrap text-base font-bold tracking-tight text-zinc-100">JobSync</span>
+          <div className="flex items-center gap-2.5">
+            <Logo className="h-7 w-7 shrink-0" />
+            <span className="whitespace-nowrap text-base font-bold tracking-tight text-zinc-100">JobSync</span>
+          </div>
         )}
       </div>
 

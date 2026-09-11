@@ -1,4 +1,4 @@
-// File: /Users/mosaqib/Desktop/learning/pdf analyser/frontend/app/page.tsx
+// File: /Users/mosaqib/Desktop/projects/JobSync/frontend/app/page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
