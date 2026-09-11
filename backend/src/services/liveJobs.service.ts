@@ -1,29 +1,29 @@
 import { env } from "../config/env.js";
-import type { JobDescription, JobMatch } from "../types/index.js";
+import type { JobDescription } from "../types/index.js";
 import { fetchLiveJobs } from "./arbeitnow.service.js";
 import { embedText } from "./embedding.service.js";
 import { filterNewJobIds, insertJobs } from "./milvus.service.js";
 
-const BATCH_SIZE = 50;
+// Concurrent embedText calls, each running local ONNX inference. This used to
+// be 50 (matching seedJobs.ts, an offline one-off script) and ran *inside*
+// the request path — on a memory-constrained long-running server that's
+// enough concurrent tensor work to OOM-kill the whole process mid-response,
+// which is exactly what happened in production (Render logs showed the
+// process going silent right after "embedding N new jobs", then the client
+// got a 502 with an empty body). Keep this low; slower is fine now that it
+// runs in the background instead of blocking a response.
+const EMBED_CONCURRENCY = 5;
 
-/**
- * Cosine similarity via dot product. Both sides come from embedText, which
- * L2-normalizes its output, so the dot product *is* the cosine — the same
- * metric the Milvus collection is indexed with.
- */
-function cosineSimilarity(a: number[], b: number[]): number {
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) {
-    sum += a[i] * b[i];
-  }
-  return sum;
-}
+// Only one refresh in flight at a time — otherwise multiple concurrent resume
+// uploads would each kick off their own batch, multiplying the exact
+// concurrent-embedding load that caused the OOM above.
+let refreshInFlight = false;
 
-async function embedJobs(jobs: JobDescription[]): Promise<(JobDescription & { embedding: number[] })[]> {
+async function embedAndCache(jobs: JobDescription[]): Promise<void> {
   const embedded: (JobDescription & { embedding: number[] })[] = [];
 
-  for (let i = 0; i < jobs.length; i += BATCH_SIZE) {
-    const batch = jobs.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < jobs.length; i += EMBED_CONCURRENCY) {
+    const batch = jobs.slice(i, i + EMBED_CONCURRENCY);
     const withEmbeddings = await Promise.all(
       batch.map(async (job) => ({
         ...job,
@@ -33,56 +33,46 @@ async function embedJobs(jobs: JobDescription[]): Promise<(JobDescription & { em
       })),
     );
     embedded.push(...withEmbeddings);
+    await insertJobs(withEmbeddings);
   }
-
-  return embedded;
 }
 
 /**
- * Fetches jobs from a live source, embeds and caches any that aren't stored
- * yet, and scores them against the resume for this request.
+ * Fetches jobs from a live source and caches any that aren't stored yet into
+ * Milvus, for future requests to find via the normal fast stored search.
  *
- * Only *newly discovered* jobs are returned — ones cached by earlier requests
- * already come back through the normal Milvus search, so returning them here
- * too would just duplicate them.
- *
- * This augments the stored search, so any failure is logged and swallowed:
- * a live-source outage must never break resume analysis.
+ * Fire-and-forget by design: call without awaiting. It never touches the
+ * response for the request that triggered it — that request only ever sees
+ * the stored/cached job set. The tradeoff is deliberate: the alternative
+ * (blocking the response on this) is what caused the production outage this
+ * replaced. A resume upload just acts as a trigger to keep the cache warm;
+ * the jobs it fetches aren't scored against that specific resume.
  */
-export async function getLiveMatches(queryEmbedding: number[]): Promise<JobMatch[]> {
-  if (!env.liveJobsEnabled) return [];
+export function refreshLiveJobsCache(): void {
+  if (!env.liveJobsEnabled || refreshInFlight) return;
 
-  try {
+  refreshInFlight = true;
+
+  (async () => {
     const fetched = await fetchLiveJobs(env.liveJobsMaxPages);
-    if (fetched.length === 0) return [];
+    if (fetched.length === 0) return;
 
     const newIds = await filterNewJobIds(fetched.map((job) => job.jobId));
     const newJobs = fetched.filter((job) => newIds.has(job.jobId));
 
     if (newJobs.length === 0) {
       console.log(`Live jobs: ${fetched.length} fetched, all already cached.`);
-      return [];
+      return;
     }
 
-    console.log(`Live jobs: embedding ${newJobs.length} new of ${fetched.length} fetched...`);
-    const embedded = await embedJobs(newJobs);
-
-    // Cache for future requests. If this fails the matches are still valid for
-    // *this* response — we just pay the embedding cost again next time.
-    try {
-      for (let i = 0; i < embedded.length; i += BATCH_SIZE) {
-        await insertJobs(embedded.slice(i, i + BATCH_SIZE));
-      }
-    } catch (err) {
-      console.warn("Caching live jobs to Milvus failed:", err);
-    }
-
-    return embedded.map(({ embedding, ...job }) => ({
-      ...job,
-      score: cosineSimilarity(queryEmbedding, embedding),
-    }));
-  } catch (err) {
-    console.warn("Live job search failed, falling back to stored jobs only:", err);
-    return [];
-  }
+    console.log(`Live jobs: caching ${newJobs.length} new of ${fetched.length} fetched...`);
+    await embedAndCache(newJobs);
+    console.log(`Live jobs: cached ${newJobs.length} new jobs.`);
+  })()
+    .catch((err) => {
+      console.warn("Live job cache refresh failed:", err);
+    })
+    .finally(() => {
+      refreshInFlight = false;
+    });
 }

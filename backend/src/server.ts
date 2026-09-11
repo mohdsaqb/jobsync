@@ -4,6 +4,16 @@ import { env } from "./config/env.js";
 import { resumeRouter } from "./routes/resume.routes.js";
 import { ensureCollection } from "./services/milvus.service.js";
 
+// The Milvus SDK's gRPC client can reject a promise internally (e.g. during
+// its own connection retry/backoff) that isn't tied to any call this code
+// awaits directly — confirmed by reproducing it locally. Node kills the whole
+// process on any unhandled rejection by default, so without this a transient
+// Zilliz connectivity blip anywhere in the app would take the entire backend
+// down for every user, not just fail the one request that triggered it.
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection (process staying up):", reason);
+});
+
 const app = express();
 
 app.use(cors(env.frontendOrigin ? { origin: env.frontendOrigin } : undefined));

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { embedQuery } from "../services/embedding.service.js";
-import { getLiveMatches } from "../services/liveJobs.service.js";
+import { refreshLiveJobsCache } from "../services/liveJobs.service.js";
 import { searchJobs } from "../services/milvus.service.js";
 import { extractSkills, skillOverlapScore } from "../services/skillMatch.service.js";
 import { extractResumeText, TextExtractionError } from "../services/textExtraction.service.js";
@@ -25,25 +25,16 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
   }
 
   try {
+    // Triggers a background pull of fresh postings into the stored collection
+    // (throttled, deduped against what's already cached). Never awaited: this
+    // request's own results only ever come from the stored search below —
+    // running the live fetch/embed inline here is what previously OOM-killed
+    // the process mid-response. Later requests benefit once caching finishes.
+    refreshLiveJobsCache();
+
     const text = await extractResumeText(file.path, file.mimetype);
     const embedding = await embedQuery(text);
-    // The stored-collection search is fast; the live pull may fetch and embed
-    // jobs we've never seen. Run them together so the live source only costs
-    // the difference, not the sum.
-    const [storedMatches, liveMatches] = await Promise.all([
-      searchJobs(embedding, env.topK),
-      getLiveMatches(embedding),
-    ]);
-
-    // getLiveMatches only returns jobs that weren't cached yet, so overlap
-    // should be empty — dedupe anyway in case a concurrent request cached the
-    // same posting in between.
-    const seen = new Set<string>();
-    const matches = [...storedMatches, ...liveMatches].filter((match) => {
-      if (seen.has(match.jobId)) return false;
-      seen.add(match.jobId);
-      return true;
-    });
+    const matches = await searchJobs(embedding, env.topK);
 
     const resumeSkills = extractSkills(text);
     const rescored = matches
