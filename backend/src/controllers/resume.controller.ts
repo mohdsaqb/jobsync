@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { embedQuery } from "../services/embedding.service.js";
+import { getLiveMatches } from "../services/liveJobs.service.js";
 import { searchJobs } from "../services/milvus.service.js";
 import { extractSkills, skillOverlapScore } from "../services/skillMatch.service.js";
 import { extractResumeText, TextExtractionError } from "../services/textExtraction.service.js";
@@ -26,7 +27,23 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
   try {
     const text = await extractResumeText(file.path, file.mimetype);
     const embedding = await embedQuery(text);
-    const matches = await searchJobs(embedding, env.topK);
+    // The stored-collection search is fast; the live pull may fetch and embed
+    // jobs we've never seen. Run them together so the live source only costs
+    // the difference, not the sum.
+    const [storedMatches, liveMatches] = await Promise.all([
+      searchJobs(embedding, env.topK),
+      getLiveMatches(embedding),
+    ]);
+
+    // getLiveMatches only returns jobs that weren't cached yet, so overlap
+    // should be empty — dedupe anyway in case a concurrent request cached the
+    // same posting in between.
+    const seen = new Set<string>();
+    const matches = [...storedMatches, ...liveMatches].filter((match) => {
+      if (seen.has(match.jobId)) return false;
+      seen.add(match.jobId);
+      return true;
+    });
 
     const resumeSkills = extractSkills(text);
     const rescored = matches
