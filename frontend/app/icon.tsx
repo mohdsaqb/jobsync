@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { LOGO_BG, LOGO_JS_PATH } from "@/lib/logoPath";
 
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
@@ -14,17 +15,11 @@ export default function Icon() {
           alignItems: "center",
           justifyContent: "center",
           borderRadius: 8,
-          background: "linear-gradient(135deg, #6366f1 0%, #7c3aed 100%)",
+          background: LOGO_BG,
         }}
       >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M4 12.5 L9.5 18 L20 6.5"
-            stroke="#ffffff"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+        <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+          <path d={LOGO_JS_PATH} fill="#ffffff" />
         </svg>
       </div>
     ),
