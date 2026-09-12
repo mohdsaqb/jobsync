@@ -66,42 +66,6 @@ export async function insertJobs(jobs: (JobDescription & { embedding: number[] }
   });
 }
 
-// Milvus parses the whole `filter` string server-side, so a single `in [...]`
-// expression holding hundreds of ids gets unwieldy. Chunking keeps each
-// expression small and predictable.
-const ID_QUERY_CHUNK = 200;
-
-/**
- * Given candidate job_ids, returns the subset NOT already stored in the
- * collection. Lets the live-job pipeline skip re-embedding and re-inserting
- * postings a previous request already cached.
- */
-export async function filterNewJobIds(jobIds: string[]): Promise<Set<string>> {
-  if (jobIds.length === 0) return new Set();
-
-  const existing = new Set<string>();
-
-  for (let i = 0; i < jobIds.length; i += ID_QUERY_CHUNK) {
-    const chunk = jobIds.slice(i, i + ID_QUERY_CHUNK);
-    // job_id values are our own `arbeitnow:<slug>` strings, but escape quotes
-    // anyway so a stray one can't break the expression.
-    const quoted = chunk.map((id) => `"${id.replace(/"/g, '\\"')}"`).join(", ");
-
-    const result = await client.query({
-      collection_name: env.milvusCollection,
-      filter: `${FIELDS.jobId} in [${quoted}]`,
-      output_fields: [FIELDS.jobId],
-      limit: chunk.length,
-    });
-
-    for (const row of result.data) {
-      existing.add(String(row[FIELDS.jobId]));
-    }
-  }
-
-  return new Set(jobIds.filter((id) => !existing.has(id)));
-}
-
 export async function dropCollection(): Promise<void> {
   const { value: exists } = await client.hasCollection({ collection_name: env.milvusCollection });
   if (exists) {

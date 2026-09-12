@@ -9,6 +9,4 @@ export const env = {
   embeddingDim: Number(process.env.EMBEDDING_DIM ?? 384),
   topK: Number(process.env.TOP_K ?? 10000),
   frontendOrigin: process.env.FRONTEND_ORIGIN,
-  liveJobsEnabled: process.env.LIVE_JOBS_ENABLED !== "false",
-  liveJobsMaxPages: Number(process.env.LIVE_JOBS_MAX_PAGES ?? 2),
 };

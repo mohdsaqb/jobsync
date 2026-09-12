@@ -2,7 +2,6 @@ import fs from "node:fs/promises";
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { embedQuery } from "../services/embedding.service.js";
-import { refreshLiveJobsCache } from "../services/liveJobs.service.js";
 import { searchJobs } from "../services/milvus.service.js";
 import { extractSkills, skillOverlapScore } from "../services/skillMatch.service.js";
 import { extractResumeText, TextExtractionError } from "../services/textExtraction.service.js";
@@ -25,13 +24,6 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
   }
 
   try {
-    // Triggers a background pull of fresh postings into the stored collection
-    // (throttled, deduped against what's already cached). Never awaited: this
-    // request's own results only ever come from the stored search below —
-    // running the live fetch/embed inline here is what previously OOM-killed
-    // the process mid-response. Later requests benefit once caching finishes.
-    refreshLiveJobsCache();
-
     const text = await extractResumeText(file.path, file.mimetype);
     const embedding = await embedQuery(text);
     const matches = await searchJobs(embedding, env.topK);
