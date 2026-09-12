@@ -32,12 +32,7 @@ async function extractFromImage(filePath: string): Promise<string> {
   }
 }
 
-/**
- * Extracts resume text from an uploaded file.
- * PDFs are read via their embedded text layer; images go through OCR.
- * Scanned PDFs with no text layer are not rasterized (kept simple) —
- * the caller should ask the user to upload an image instead.
- */
+/** PDFs are read via their text layer; images go through OCR. Scanned PDFs aren't rasterized. */
 export async function extractResumeText(filePath: string, mimetype: string): Promise<string> {
   let text: string;
 

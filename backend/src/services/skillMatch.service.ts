@@ -1,10 +1,5 @@
-// A single whole-document embedding can be misled by a handful of stray
-// keywords (e.g. a MERN resume mentioning "deployed with Docker on AWS" can
-// drift the vector toward DevOps job descriptions, which are dense with
-// infrastructure terms). This explicit skill-overlap score is blended with
-// the semantic score in resume.controller.ts to correct for that — it
-// directly checks how many of a job's actual required skills the resume
-// mentions, rather than relying purely on overall topical similarity.
+// Stray keywords can drag a whole-document embedding toward the wrong job
+// category, so this score is blended with the semantic one in resume.controller.ts.
 const SKILL_KEYWORDS = [
   // Frontend
   "react", "react native", "angular", "vue", "next.js", "nuxt", "svelte",

@@ -3,13 +3,8 @@ export interface ScoreTier {
   classes: string;
 }
 
-// Raw cosine similarity between a resume and a job description rarely goes
-// much above ~0.6-0.7, even for a genuinely great match — the two texts are
-// differently structured (achievements vs. requirements), so the embedding
-// model's ceiling is far below 1.0. Remapping raw score -> a friendlier
-// percentage for display keeps the underlying ranking/filtering untouched
-// (it's a monotonic transform) while showing users a number that reflects
-// how good a match actually is in relative terms.
+// Raw cosine scores rarely exceed ~0.7 even for great matches, so remap them to
+// a friendlier display percent. Monotonic, so ranking is unaffected.
 const ANCHORS: [raw: number, displayPercent: number][] = [
   [0.1, 60],
   [0.4, 90],

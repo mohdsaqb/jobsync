@@ -21,13 +21,8 @@ function renderInline(text: string) {
   );
 }
 
-/**
- * Gemini's response is markdown-ish (numbered points with a bold lead-in
- * followed by a body paragraph, occasional bullet lists). There's no
- * markdown library in this project, and the shape is predictable enough
- * that a small hand-rolled formatter reads better than raw text with
- * literal "**" in it.
- */
+// Gemini returns markdown-ish text; its shape is predictable enough that this
+// small formatter beats pulling in a markdown library.
 function SuggestionsContent({ text }: { text: string }) {
   const blocks = text.trim().split(/\n{2,}/);
 

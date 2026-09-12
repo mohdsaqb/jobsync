@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Bookmark, BookmarkCheck, Building2 } from "lucide-react";
 import type { JobMatch } from "@/lib/types";
 import { matchPercent, scoreTier } from "@/lib/scoreTier";
+import { useJobActions } from "@/lib/useJobActions";
 import { cn } from "@/lib/cn";
 
 interface JobCardProps {
@@ -12,30 +12,14 @@ interface JobCardProps {
 }
 
 export default function JobCard({ match, onOpen }: JobCardProps) {
-  const [saved, setSaved] = useState(false);
-  const [showApplyNote, setShowApplyNote] = useState(false);
-  const storageKey = `resume-analyser:saved:${match.jobId}`;
+  const { saved, toggleSaved, showApplyNote, handleApply } = useJobActions(match.jobId);
   const percent = matchPercent(match.score);
   const tier = scoreTier(match.score);
 
-  useEffect(() => {
-    setSaved(localStorage.getItem(storageKey) === "1");
-  }, [storageKey]);
-
-  const toggleSaved = (e: React.MouseEvent) => {
+  // The whole card is clickable, so these buttons must not bubble up to it.
+  const stopAnd = (fn: () => void) => (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSaved((prev) => {
-      const next = !prev;
-      if (next) localStorage.setItem(storageKey, "1");
-      else localStorage.removeItem(storageKey);
-      return next;
-    });
-  };
-
-  const handleApply = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setShowApplyNote(true);
-    setTimeout(() => setShowApplyNote(false), 2500);
+    fn();
   };
 
   return (
@@ -58,7 +42,7 @@ export default function JobCard({ match, onOpen }: JobCardProps) {
         </div>
         <button
           type="button"
-          onClick={toggleSaved}
+          onClick={stopAnd(toggleSaved)}
           aria-label={saved ? "Remove from saved jobs" : "Save job"}
           className="shrink-0 rounded-full p-1.5 text-zinc-400 transition hover:bg-white/10 hover:text-amber-300"
         >
@@ -80,7 +64,7 @@ export default function JobCard({ match, onOpen }: JobCardProps) {
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
-          onClick={handleApply}
+          onClick={stopAnd(handleApply)}
           className="rounded-lg bg-zinc-50 px-3.5 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
         >
           Apply

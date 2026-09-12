@@ -4,12 +4,8 @@ import { env } from "./config/env.js";
 import { resumeRouter } from "./routes/resume.routes.js";
 import { ensureCollection } from "./services/milvus.service.js";
 
-// The Milvus SDK's gRPC client can reject a promise internally (e.g. during
-// its own connection retry/backoff) that isn't tied to any call this code
-// awaits directly — confirmed by reproducing it locally. Node kills the whole
-// process on any unhandled rejection by default, so without this a transient
-// Zilliz connectivity blip anywhere in the app would take the entire backend
-// down for every user, not just fail the one request that triggered it.
+// The Milvus SDK rejects promises internally during connection retries; without
+// this, a transient Zilliz blip would crash the whole process.
 process.on("unhandledRejection", (reason) => {
   console.error("Unhandled rejection (process staying up):", reason);
 });
@@ -22,8 +18,7 @@ app.use(express.json({ limit: "1mb" }));
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 app.use("/api/resume", resumeRouter);
 
-// Catches multer errors (bad file type, file too large) and anything else
-// thrown before a route's own try/catch runs.
+// Catches multer errors and anything thrown before a route's own try/catch.
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(400).json({ error: err.message || "Request failed." });

@@ -8,10 +8,7 @@ import { extractResumeText, TextExtractionError } from "../services/textExtracti
 
 const MIN_MATCH_SCORE = 0.1;
 
-// Blend weights for the final ranking score. Semantic similarity captures
-// overall topical/contextual fit; skill overlap corrects for cases where a
-// handful of stray keywords (e.g. "deployed with Docker" in a MERN resume)
-// would otherwise drag an unrelated job category to the top.
+// Final score blends semantic fit with explicit skill overlap (see skillMatch.service.ts).
 const SEMANTIC_WEIGHT = 0.6;
 const SKILL_WEIGHT = 0.4;
 

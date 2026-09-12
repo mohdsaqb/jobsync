@@ -14,7 +14,7 @@ Upload a resume and get back the jobs (from a preloaded set of job descriptions)
 
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind CSS — dark, glassmorphic UI with a draggable/collapsible sidebar
 - **Backend:** Node.js + Express + TypeScript
-- **Text extraction:** `pdf-parse` (PDFs) + `tesseract.js` (OCR for images)
+- **Text extraction:** `pdfjs-dist` (PDFs) + `tesseract.js` (OCR for images)
 - **Embeddings:** `@xenova/transformers` (local, `Xenova/all-MiniLM-L6-v2`, 384 dimensions)
 - **Vector search:** Milvus (standalone, via Docker Compose), cosine similarity
 - **AI resume suggestions:** Google Gemini (`@google/genai`, `gemini-flash-latest`) — the only part of this project that calls an external API, and it has a free tier
@@ -113,35 +113,44 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 ```
 backend/
   src/
-    server.ts                    # Express app entry
-    routes/resume.routes.ts      # POST /api/resume/analyze, /api/resume/suggest
+    server.ts                   # Express app entry
+    config/env.ts               # env vars + defaults
+    routes/resume.routes.ts     # POST /api/resume/analyze, /api/resume/suggest
     controllers/
-      resume.controller.ts
-      suggestions.controller.ts  # AI suggestions request handling
+      resume.controller.ts      # extract -> embed -> search -> rescore
+      suggestions.controller.ts # AI suggestions request handling
     services/
-      textExtraction.service.ts  # PDF text / OCR extraction
-      embedding.service.ts       # local embedding model
-      milvus.service.ts          # Milvus collection + search
-      aiSuggestions.service.ts   # Gemini API call
+      textExtraction.service.ts # PDF text / OCR extraction
+      embedding.service.ts      # local embedding model
+      milvus.service.ts         # Milvus collection + search
+      skillMatch.service.ts     # keyword skill-overlap scoring
+      aiSuggestions.service.ts  # Gemini API call
     scripts/
-      generateJobs.ts            # generates data/jobs.json (50 role templates)
-      seedJobs.ts                 # embeds + inserts jobs into Milvus
-    data/jobs.json                # sample job descriptions
+      generateJobs.ts           # generates data/jobs.json (role templates)
+      fetchAdzunaJobs.ts        # appends real postings from the Adzuna API
+      seedJobs.ts               # embeds + inserts jobs into Milvus
+    data/jobs.json              # job descriptions used for seeding
+    types/index.ts              # JobDescription / JobMatch
 frontend/
   app/
     layout.tsx / page.tsx / globals.css
+    icon.tsx / apple-icon.tsx   # generated favicon + touch icon
   components/
-    Sidebar.tsx                  # draggable/collapsible nav
-    UploadPanel.tsx               # drag-and-drop resume upload
-    ResultsPanel.tsx              # paginated job match grid
+    Sidebar.tsx                 # draggable/collapsible nav
+    UploadPanel.tsx             # drag-and-drop resume upload
+    ResultsPanel.tsx            # paginated job match grid
     JobCard.tsx
-    JobDetailModal.tsx             # full posting, opened by clicking a card
-    ResumeSuggestions.tsx         # target-role input + AI suggestions
-    BackgroundGlow.tsx            # decorative glass backdrop
+    JobDetailModal.tsx          # full posting, opened by clicking a card
+    ResumeSuggestions.tsx       # target-role input + AI suggestions
+    BackgroundGlow.tsx          # decorative glass backdrop
+    Logo.tsx
   lib/
-    api.ts                        # calls the backend
+    api.ts                      # calls the backend
     types.ts
-    scoreTier.ts                  # shared match-score styling
-  next.config.mjs                 # proxies /api/* to the backend
-docker-compose.yml               # Milvus standalone stack
+    scoreTier.ts                # match-score -> percent + styling
+    useJobActions.ts            # save/apply behaviour shared by card + modal
+    logoPath.ts                 # logo vector paths
+    cn.ts                       # classname helper
+  next.config.mjs               # proxies /api/* to the backend
+docker-compose.yml              # Milvus standalone stack
 ```

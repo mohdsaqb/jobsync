@@ -10,21 +10,15 @@ function getExtractor(): Promise<FeatureExtractionPipeline> {
   return extractorPromise;
 }
 
-/**
- * Embeds text into a normalized vector using a local transformer model.
- * Mean-pooling + L2 normalization is done by the pipeline itself.
- */
+/** Embeds text into an L2-normalized vector using a local transformer model. */
 export async function embedText(text: string): Promise<number[]> {
   const extractor = await getExtractor();
   const output = await extractor(text, { pooling: "mean", normalize: true });
   return Array.from(output.data as Float32Array);
 }
 
-// BGE-family retrieval models are trained asymmetrically: the *query* side
-// (a resume, here) needs this instruction prefix for best results, while the
-// *passage* side (job descriptions, embedded via plain embedText in
-// seedJobs.ts/fetchAdzunaJobs.ts) is embedded without it. Harmless no-op for
-// non-BGE models — they just treat it as literal text.
+// BGE models are trained asymmetrically: queries (resumes) need this prefix,
+// passages (job descriptions, embedded via plain embedText) don't.
 const QUERY_PREFIX = "Represent this sentence for searching relevant passages: ";
 
 export async function embedQuery(text: string): Promise<number[]> {

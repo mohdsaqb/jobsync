@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bookmark, BookmarkCheck, Building2, X } from "lucide-react";
 import type { JobMatch } from "@/lib/types";
 import { matchPercent, scoreTier } from "@/lib/scoreTier";
+import { useJobActions } from "@/lib/useJobActions";
 import { cn } from "@/lib/cn";
 
 interface JobDetailModalProps {
@@ -13,14 +14,7 @@ interface JobDetailModalProps {
 }
 
 export default function JobDetailModal({ job, onClose }: JobDetailModalProps) {
-  const [saved, setSaved] = useState(false);
-  const [showApplyNote, setShowApplyNote] = useState(false);
-
-  useEffect(() => {
-    if (!job) return;
-    setSaved(localStorage.getItem(`resume-analyser:saved:${job.jobId}`) === "1");
-    setShowApplyNote(false);
-  }, [job]);
+  const { saved, toggleSaved, showApplyNote, handleApply } = useJobActions(job?.jobId);
 
   useEffect(() => {
     if (!job) return;
@@ -30,22 +24,6 @@ export default function JobDetailModal({ job, onClose }: JobDetailModalProps) {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [job, onClose]);
-
-  const toggleSaved = () => {
-    if (!job) return;
-    const key = `resume-analyser:saved:${job.jobId}`;
-    setSaved((prev) => {
-      const next = !prev;
-      if (next) localStorage.setItem(key, "1");
-      else localStorage.removeItem(key);
-      return next;
-    });
-  };
-
-  const handleApply = () => {
-    setShowApplyNote(true);
-    setTimeout(() => setShowApplyNote(false), 2500);
-  };
 
   const tier = job ? scoreTier(job.score) : null;
   const percent = job ? matchPercent(job.score) : 0;

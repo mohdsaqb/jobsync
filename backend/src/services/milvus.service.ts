@@ -5,9 +5,7 @@ import type { JobDescription, JobMatch } from "../types/index.js";
 const client = new MilvusClient({
   address: env.milvusAddress,
   token: env.milvusToken,
-  // The SDK's default RPC deadline is 15s, which Zilliz Cloud's managed
-  // cluster (plus free-tier cold starts) can exceed on createCollection/
-  // createIndex/insert calls. 60s gives it enough room.
+  // The SDK's 15s default is too tight for Zilliz Cloud cold starts.
   timeout: 60000,
 });
 
@@ -20,11 +18,7 @@ const FIELDS = {
   embedding: "embedding",
 } as const;
 
-/**
- * Creates the job_descriptions collection + a COSINE similarity index if they
- * don't already exist yet, then loads the collection into memory for search.
- * Safe to call on every server/script startup.
- */
+/** Creates the collection + COSINE index if missing, then loads it for search. */
 export async function ensureCollection(): Promise<void> {
   const { value: exists } = await client.hasCollection({ collection_name: env.milvusCollection });
 
@@ -78,15 +72,10 @@ export async function countJobs(): Promise<number> {
   return Number(stats.data.row_count ?? 0);
 }
 
-// Zilliz Cloud serverless clusters cap the search `limit` parameter at 1024 —
-// exceeding it doesn't error, it silently returns zero hits. Clamping here
-// keeps TOP_K misconfiguration from ever causing that again.
+// Zilliz Cloud caps search limit at 1024 — going over silently returns 0 hits.
 const MAX_SEARCH_LIMIT = 1024;
 
-/**
- * Runs a cosine-similarity search over the job_descriptions collection and
- * returns the top matches, best first.
- */
+/** Cosine-similarity search over the collection, best matches first. */
 export async function searchJobs(embedding: number[], topK = env.topK): Promise<JobMatch[]> {
   const result = await client.search({
     collection_name: env.milvusCollection,

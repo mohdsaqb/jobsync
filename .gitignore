@@ -1,8 +1,12 @@
 node_modules/
 dist/
 build/
+.next/
+*.tsbuildinfo
 .env
 volumes/
 backend/uploads/*
 !backend/uploads/.gitkeep
+# tesseract.js downloads OCR training data into the backend cwd at runtime
+*.traineddata
 .DS_Store
