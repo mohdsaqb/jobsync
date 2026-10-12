@@ -2,8 +2,9 @@
 
 import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bookmark, BookmarkCheck, Building2, X } from "lucide-react";
+import { Banknote, Bookmark, BookmarkCheck, Building2, Clock, ExternalLink, MapPin, X } from "lucide-react";
 import type { JobMatch } from "@/lib/types";
+import { formatPostedAge, formatSalary } from "@/lib/jobMeta";
 import { matchPercent, scoreTier } from "@/lib/scoreTier";
 import { useJobActions } from "@/lib/useJobActions";
 import { cn } from "@/lib/cn";
@@ -80,16 +81,51 @@ export default function JobDetailModal({ job, onClose }: JobDetailModalProps) {
               </span>
             )}
 
+            {(job.location || formatSalary(job.salaryMin, job.salaryMax) || formatPostedAge(job.createdAt)) && (
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-500">
+                {job.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    {job.location}
+                  </span>
+                )}
+                {formatSalary(job.salaryMin, job.salaryMax) && (
+                  <span className="flex items-center gap-1">
+                    <Banknote className="h-3 w-3" />
+                    {formatSalary(job.salaryMin, job.salaryMax)} per year
+                  </span>
+                )}
+                {formatPostedAge(job.createdAt) && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Posted {formatPostedAge(job.createdAt)}
+                  </span>
+                )}
+              </div>
+            )}
+
             <p className="mt-4 whitespace-pre-line text-sm leading-relaxed text-zinc-300">{job.description}</p>
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleApply}
-                className="rounded-lg bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
-              >
-                Apply
-              </button>
+              {job.url ? (
+                <a
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 rounded-lg bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
+                >
+                  Apply on Adzuna
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="rounded-lg bg-zinc-50 px-4 py-2 text-sm font-medium text-zinc-900 transition hover:bg-white"
+                >
+                  Apply
+                </button>
+              )}
               <button
                 type="button"
                 onClick={toggleSaved}
@@ -98,8 +134,8 @@ export default function JobDetailModal({ job, onClose }: JobDetailModalProps) {
                 {saved ? <BookmarkCheck className="h-4 w-4 text-amber-300" /> : <Bookmark className="h-4 w-4" />}
                 {saved ? "Saved" : "Save"}
               </button>
-              {showApplyNote && (
-                <span className="text-xs text-zinc-500">Demo data — apply links aren&apos;t wired up yet.</span>
+              {showApplyNote && !job.url && (
+                <span className="text-xs text-zinc-500">Demo posting — no apply link for this one.</span>
               )}
             </div>
           </motion.div>

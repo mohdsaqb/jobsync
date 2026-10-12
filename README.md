@@ -26,6 +26,7 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 - **Drag-and-drop resume upload** — PDF (text layer) or PNG/JPG (OCR via Tesseract)
 - **Local semantic embedding** — runs in-process on the backend, no API key or per-request cost
 - **Vector similarity search** — Milvus with an HNSW index, cosine similarity
+- **Live job data** — real postings with working apply links, location and salary, kept fresh by a daily sync plus an on-demand fetch for a named role
 - **Skill-overlap rescoring** — corrects semantic drift by directly checking required-skill coverage
 - **AI resume coaching** — role-targeted, actionable suggestions via Groq (optional, provider-swappable)
 - **Paginated, ranked results** with a bookmark toggle and a full-detail modal per job
@@ -35,7 +36,8 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 
 Concrete numbers from the shipped project — this is a demo/portfolio build with no formal benchmark suite, so these are architectural facts, not accuracy claims:
 
-- **10,005** seeded job listings across **450+** companies (`backend/src/data/jobs.json`)
+- **Real job postings** from the Adzuna API, refreshed by a scheduled sync and filtered to the last 90 days
+- **~83** Adzuna calls/day sustainable on the free tier — 2,500/month is the binding cap, not the 250/day headline
 - **384-dimension** embeddings (`bge-small-en-v1.5`, mean-pooled, L2-normalized)
 - Up to **1,024** candidate matches retrieved per search (Zilliz Cloud's serverless search-limit ceiling)
 - **5MB** upload limit, **3** supported input formats (PDF, PNG, JPEG)
@@ -114,6 +116,9 @@ sequenceDiagram
 
 - **`embedding.service.ts`** — loads `bge-small-en-v1.5` once via `@xenova/transformers` and reuses it. Output is mean-pooled and L2-normalized, so cosine similarity reduces to a plain dot product wherever it's needed outside Milvus. Queries get a BGE-specific instruction prefix that passages don't, since the model is trained asymmetrically for retrieval.
 - **`milvus.service.ts`** — owns the collection schema (`job_id`, `title`, `company`, `description`, `embedding`) and an HNSW index with a COSINE metric. Clamps the search `limit` to 1024 to work around a Zilliz Cloud serverless quirk (see below).
+- **`adzuna.service.ts`** — the shared Adzuna client for both the scheduled sync and the request-path warm. Filters postings older than `ADZUNA_MAX_AGE_DAYS` at ingest: measured against live results, Adzuna's median posting is ~50 days old and the 75th percentile over 500, so a fresh-jobs feed has to reject most of what it fetches.
+- **`adzunaBudget.ts`** — enforces all four published rate limits together (25/min, 250/day, 1000/week, 2500/month). They don't compose, so the monthly cap is the real constraint at ~83 calls/day; per-channel daily sub-caps stop the sync starving the request path.
+- **`jobWarmer.ts`** — indexes fresh postings for a role *after* the response. Blocking on Adzuna would turn a sub-second search into an eight-second one. Every failure is swallowed, so a broken or rate-limited Adzuna can never fail an `/analyze` that otherwise succeeded.
 - **`skillMatch.service.ts`** — matches resume/job text against a curated keyword list with word-boundary-aware regex, and scores overlap as *(skills the resume has) / (skills the job asks for)*.
 - **`textExtraction.service.ts`** — reads a PDF's embedded text layer directly (`pdfjs-dist`); for images, runs Tesseract OCR.
 - **`aiSuggestions.service.ts`** — a thin wrapper over the configured LLM provider with a fixed resume-coach system prompt, capped at 6 concrete suggestions per response. The resume is truncated to 8,000 characters before sending, since Groq's free tier allows ~6,000 tokens per minute and a full-length resume would consume a whole minute's budget alone.
@@ -158,7 +163,8 @@ backend/
       llm/                      # LlmProvider interface + Groq and Gemini providers
     scripts/
       generateJobs.ts           # generates data/jobs.json (role templates)
-      fetchAdzunaJobs.ts        # appends real postings from the Adzuna API
+      fetchAdzunaJobs.ts        # appends real postings to data/jobs.json (legacy path)
+      syncJobs.ts               # scheduled sync: fetch, dedup, embed, insert, evict
       seedJobs.ts               # embeds + inserts jobs into Milvus
     data/jobs.json              # job descriptions used for seeding
     types/index.ts              # JobDescription / JobMatch
@@ -194,11 +200,17 @@ Liveness check. Returns `200 { "status": "ok" }`.
 **`POST /api/resume/analyze`**
 `multipart/form-data`, field name `resume` — PDF, PNG, or JPEG, ≤5MB.
 
+Optional fields: `targetRole` (≤200 chars) and `location` (≤120 chars). Naming a role starts a background fetch of fresh postings for it, indexed for *subsequent* searches rather than this response — Adzuna takes 3-7s per page, too slow to block on.
+
 Response `200`:
 ```json
 {
-  "matches": [{ "jobId": "...", "title": "...", "company": "...", "description": "...", "score": 0.0 }],
-  "resumeText": "..."
+  "matches": [{
+    "jobId": "...", "title": "...", "company": "...", "description": "...", "score": 0.0,
+    "url": "...", "location": "...", "salaryMin": 0, "salaryMax": 0, "createdAt": 0
+  }],
+  "resumeText": "...",
+  "meta": { "warming": false, "lastSyncAt": 0, "corpusSize": 0 }
 }
 ```
 Errors: `400` no file / unsupported type or too large · `422` couldn't extract enough text (e.g. a scanned PDF with no text layer) · `500` unexpected failure.
@@ -263,6 +275,7 @@ To regenerate the job pool or start over:
 ```bash
 npm run generate:jobs   # regenerates data/jobs.json with a fresh synthetic set
 npm run seed:reset      # drops the existing Milvus collection and re-seeds it
+npm run sync:jobs       # pulls fresh real postings from Adzuna into Milvus
 ```
 
 ### 3. Run the backend
@@ -291,7 +304,7 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 - Upload a resume and the view transitions into a **results screen**, 20 matches per page, with Prev/Next and a jump-to-page control.
 - Jobs scoring **10% or below** are filtered out server-side, so you won't see irrelevant postings.
 - Click any **job card** to open its full posting in a modal, with the same Save/Apply actions.
-- Each job has a working **bookmark toggle** (persisted in `localStorage`). **Apply** is a demo affordance — postings are synthetic, so it shows a note instead of linking anywhere real.
+- Each job has a working **bookmark toggle** (persisted in `localStorage`), and **Apply** opens the real posting on Adzuna.
 - The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
 
 ## Testing

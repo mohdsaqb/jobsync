@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import JobCard from "./JobCard";
 import JobDetailModal from "./JobDetailModal";
+import { formatSyncAge } from "@/lib/jobMeta";
 import type { AnalyzeMeta, JobMatch } from "@/lib/types";
 
 interface ResultsPanelProps {
@@ -16,6 +17,13 @@ interface ResultsPanelProps {
 const PAGE_SIZE = 20;
 
 export default function ResultsPanel({ matches, meta, onNewAnalysis }: ResultsPanelProps) {
+  const corpusLine = [
+    meta?.corpusSize ? `${meta.corpusSize.toLocaleString()} roles indexed` : null,
+    formatSyncAge(meta?.lastSyncAt) ? `last synced ${formatSyncAge(meta?.lastSyncAt)}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const [selectedJob, setSelectedJob] = useState<JobMatch | null>(null);
   const [page, setPage] = useState(1);
   const [direction, setDirection] = useState(0);
@@ -68,6 +76,7 @@ export default function ResultsPanel({ matches, meta, onNewAnalysis }: ResultsPa
               </>
             )}
           </p>
+          {corpusLine && <p className="mt-1 text-xs text-zinc-500">{corpusLine}</p>}
           {meta?.warming && (
             <p className="mt-2 text-xs text-indigo-300">
               Pulling in fresh postings for that role — they&apos;ll show up next time you search.
