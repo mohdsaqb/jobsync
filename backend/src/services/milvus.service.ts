@@ -1,4 +1,4 @@
-import { DataType, MetricType, MilvusClient } from "@zilliz/milvus2-sdk-node";
+import { ConsistencyLevelEnum, DataType, MetricType, MilvusClient } from "@zilliz/milvus2-sdk-node";
 import { env } from "../config/env.js";
 import type { JobDescription, JobMatch } from "../types/index.js";
 
@@ -124,9 +124,84 @@ export async function dropCollection(): Promise<void> {
   }
 }
 
+/**
+ * Seals the current growing segment. Row counts and delete expressions only
+ * see flushed data, so writers must flush before reporting or evicting.
+ */
+export async function flushCollection(): Promise<void> {
+  await client.flushSync({ collection_names: [env.milvusCollection] });
+}
+
+/**
+ * Live row count. Deliberately a `count(*)` query rather than
+ * getCollectionStatistics: Milvus deletes are tombstones until compaction, so
+ * the statistic over-reports after an eviction while this does not.
+ */
 export async function countJobs(): Promise<number> {
-  const stats = await client.getCollectionStatistics({ collection_name: env.milvusCollection });
-  return Number(stats.data.row_count ?? 0);
+  const result = await client.query({
+    collection_name: env.milvusCollection,
+    expr: "",
+    output_fields: ["count(*)"],
+    consistency_level: ConsistencyLevelEnum.Strong,
+  });
+  return Number(result.data?.[0]?.["count(*)"] ?? 0);
+}
+
+/**
+ * Which of the supplied job ids are already indexed. Milvus has no uniqueness
+ * constraint, so dedup before insert has to be explicit or postings arrive
+ * twice on every sync.
+ */
+export async function findExistingJobIds(jobIds: string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  if (jobIds.length === 0) return found;
+
+  // A single `in` expression with thousands of ids is rejected for length, so
+  // the lookup is chunked.
+  const CHUNK = 200;
+  for (let i = 0; i < jobIds.length; i += CHUNK) {
+    const chunk = jobIds.slice(i, i + CHUNK);
+    const expr = `${FIELDS.jobId} in [${chunk.map((id) => JSON.stringify(id)).join(", ")}]`;
+    const result = await client.query({
+      collection_name: env.milvusCollection,
+      expr,
+      output_fields: [FIELDS.jobId],
+      limit: chunk.length,
+      // Query defaults to Bounded consistency, which can be seconds stale. A
+      // stale read here would re-insert postings that are already indexed.
+      consistency_level: ConsistencyLevelEnum.Strong,
+    });
+    for (const row of result.data ?? []) {
+      found.add(String(row[FIELDS.jobId]));
+    }
+  }
+
+  return found;
+}
+
+/** Removes postings published before `cutoff` (epoch seconds). Returns the count deleted. */
+export async function deleteJobsOlderThan(cutoff: number): Promise<number> {
+  const expr = `${FIELDS.createdAt} < ${Math.floor(cutoff)}`;
+  const result = await client.deleteEntities({ collection_name: env.milvusCollection, expr });
+  return Number(result.delete_cnt ?? 0);
+}
+
+/**
+ * Points `alias` at `collectionName`, creating the alias if it doesn't exist.
+ * Readers querying the alias switch over atomically, so a rebuilt collection
+ * can be swapped in without anyone seeing a half-filled index.
+ */
+export async function pointAliasAt(alias: string, collectionName: string): Promise<void> {
+  const existing = await client.listAliases({ collection_name: collectionName });
+  const aliases: string[] = (existing as { aliases?: string[] }).aliases ?? [];
+
+  if (aliases.includes(alias)) return;
+
+  try {
+    await client.alterAlias({ collection_name: collectionName, alias });
+  } catch {
+    await client.createAlias({ collection_name: collectionName, alias });
+  }
 }
 
 // Zilliz Cloud caps search limit at 1024 — going over silently returns 0 hits.

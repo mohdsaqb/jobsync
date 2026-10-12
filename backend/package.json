@@ -10,7 +10,8 @@
     "seed": "tsx src/scripts/seedJobs.ts",
     "seed:reset": "tsx src/scripts/seedJobs.ts --reset",
     "generate:jobs": "tsx src/scripts/generateJobs.ts",
-    "fetch:adzuna": "tsx src/scripts/fetchAdzunaJobs.ts"
+    "fetch:adzuna": "tsx src/scripts/fetchAdzunaJobs.ts",
+    "sync:jobs": "tsx src/scripts/syncJobs.ts"
   },
   "dependencies": {
     "@google/genai": "^2.15.0",
