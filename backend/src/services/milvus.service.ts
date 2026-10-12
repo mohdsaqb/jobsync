@@ -124,6 +124,16 @@ export async function dropCollection(): Promise<void> {
   }
 }
 
+/** Whether Milvus is reachable. Used by the health endpoint an uptime monitor hits. */
+export async function isMilvusHealthy(): Promise<boolean> {
+  try {
+    const result = await client.checkHealth();
+    return Boolean(result.isHealthy);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Seals the current growing segment. Row counts and delete expressions only
  * see flushed data, so writers must flush before reporting or evicting.

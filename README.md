@@ -141,7 +141,8 @@ sequenceDiagram
 | Text extraction | `pdfjs-dist` (PDF text layer), `tesseract.js` (OCR for images) |
 | Vector database | Milvus (Docker Compose) or Zilliz Cloud — HNSW index, cosine similarity |
 | AI suggestions | Groq (`groq-sdk`, `openai/gpt-oss-120b`) — swappable to Google Gemini via `LLM_PROVIDER` |
-| Infra | Docker Compose (etcd, MinIO, Milvus standalone) |
+| Infra | Docker Compose (etcd, MinIO, Milvus standalone) locally; Caddy + Zilliz Cloud in production |
+| Scheduled jobs | GitHub Actions (daily Adzuna sync, off the web host) |
 
 ## Project Structure
 
@@ -307,6 +308,63 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 - Each job has a working **bookmark toggle** (persisted in `localStorage`), and **Apply** opens the real posting on Adzuna.
 - The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
 
+## Deployment
+
+The app is designed to run on free infrastructure and stay warm — no spin-down pause, no cold start on the first visit.
+
+### What runs where
+
+| Layer | Choice | Cost |
+|---|---|---|
+| Vector DB | Zilliz Cloud free cluster (5GB; suspends only after 7 days idle, which the monitor below prevents) | $0 |
+| Backend + frontend | Any always-on host, behind Caddy for TLS | $0 on a free VM |
+| Scheduled job sync | GitHub Actions | $0 |
+| Job data | Adzuna free tier | $0 |
+| LLM | Groq free tier | $0 |
+| TLS + hostname | Caddy with Let's Encrypt, over a free DuckDNS subdomain | $0 |
+| Monitoring | UptimeRobot | $0 |
+
+**Sizing matters more than the provider.** The embedding model runs in-process, so the backend sits around 400–600MB resident and spikes higher during image OCR. A 512MB free tier is not enough; budget 1GB or more, and measure it on your own resumes before committing to a host.
+
+### Deploy
+
+```bash
+# On the server, with Docker and the compose plugin installed:
+git clone https://github.com/mohdsaqb/jobsync.git && cd jobsync
+cp backend/.env.example backend/.env    # then fill in the keys below
+$EDITOR Caddyfile                       # replace the hostname with yours
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+`backend/.env` needs `MILVUS_ADDRESS` and `MILVUS_TOKEN` (your Zilliz cluster), `GROQ_API_KEY`, `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`, and `FRONTEND_ORIGIN=https://your-host` so CORS is restricted in production.
+
+Only Caddy publishes ports. The backend is reachable solely from the frontend container over the compose network, and the frontend proxies `/api/*` to it, so the API is never exposed directly.
+
+The backend image bakes in the embedding model and Tesseract's language data at build time. Without that, the first visitor after each deploy waits on a ~34MB download — a cold start by another name on an "always-on" box. The image is roughly 1GB as a result, most of it the ONNX and OCR runtimes.
+
+### Keeping the job corpus fresh
+
+`.github/workflows/sync-jobs.yml` runs the sync daily on GitHub's runners rather than the web host, because embedding a few hundred postings needs real CPU and free web tiers have little of it — and no cron. Add these repository secrets: `MILVUS_ADDRESS`, `MILVUS_TOKEN`, `MILVUS_COLLECTION`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, plus optional variables `ADZUNA_COUNTRY` and `ADZUNA_MAX_AGE_DAYS`.
+
+Each run is capped with `--max-calls` because the runner is stateless: the persisted Adzuna call history starts empty every time, so the cap is what keeps spending inside the monthly 2,500.
+
+### Monitoring with UptimeRobot
+
+Create one free HTTP monitor on `https://your-host/health`, every 5 minutes, with email alerts. It does two jobs:
+
+- **Alerting** — you find out the stack is down without opening the site.
+- **Keeping Zilliz awake** — free clusters suspend after 7 days idle, and regular traffic prevents that.
+
+`/health` deliberately checks its dependency rather than only confirming the process is alive:
+
+```json
+{ "status": "ok", "milvus": "ok", "corpusSize": 1842, "lastSyncAt": 1791839891 }
+```
+
+It returns **503** with `"status": "degraded"` when Milvus is unreachable, so the monitor goes red while `/analyze` is genuinely broken — a plain liveness ping would have stayed green. The dependency probe is cached for 30 seconds, so five-minute polling costs nothing.
+
+One caveat worth stating plainly: pinging every 5 minutes prevents a host's *idle spin-down*, but it does not satisfy providers that reclaim under-utilised instances against CPU and memory thresholds — a HEAD request every five minutes leaves those far below any such floor. Check your provider's specific policy rather than assuming the pings cover it.
+
 ## Testing
 
 There's no automated test suite yet (see Future Improvements) — verify changes manually:
@@ -316,13 +374,18 @@ There's no automated test suite yet (see Future Improvements) — verify changes
 3. With both dev servers running, upload a resume and confirm ranked matches appear.
 4. Open a job card, toggle its bookmark, and confirm it persists across a page reload.
 5. Enter a target role in the suggestions panel and confirm the LLM returns formatted, role-specific feedback (requires `GROQ_API_KEY`).
+6. `curl localhost:4000/health` — expect `200` with `"milvus": "ok"`. Stop Milvus and confirm it becomes a `503`; a health check that cannot fail is not a health check.
+7. Restart the backend and time the *first* `/analyze`. It should be well under a second — several seconds means the embedding model isn't being warmed at startup.
+8. Set an invalid `ADZUNA_APP_KEY`, upload with a target role, and confirm `/analyze` still returns `200` with matches while the background fetch fails in the logs.
 
 ## Future Improvements
 
 - **Automated tests** — unit tests for the scoring/ranking logic, integration tests for the API endpoints.
 - **A shared types package** — `JobMatch` is currently hand-duplicated between `backend/src/types` and `frontend/lib/types.ts`, with no compile-time guarantee they stay in sync.
-- **Auth and rate-limiting** on the API endpoints — currently open to any caller.
+- **Auth and rate-limiting** on the API endpoints — currently open to any caller, and embedding is CPU-bound, so `/analyze` is trivially abusable.
 - **OCR fallback for scanned PDFs** — image-only PDFs currently need to be re-uploaded as a PNG/JPG rather than being rasterized automatically.
+- **A smaller backend image** — around 1GB, mostly ONNX and OCR runtimes. `onnxruntime-web` in particular is only needed in browsers and could likely be excluded.
+- **Location and salary filters** — both fields are now indexed, so filtered vector search is the natural next feature.
 
 ## Closing
 

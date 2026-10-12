@@ -1,0 +1,12 @@
+# Replace with your own hostname. A free DuckDNS subdomain works, and Caddy
+# provisions and renews the TLS certificate automatically.
+jobsync.duckdns.org {
+	encode gzip
+
+	# Everything goes to Next.js, which proxies /api/* on to the backend.
+	reverse_proxy frontend:3000
+
+	log {
+		output stdout
+	}
+}

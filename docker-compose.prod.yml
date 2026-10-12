@@ -1,0 +1,45 @@
+# Production stack. Unlike docker-compose.yml (which runs Milvus locally for
+# development), this expects a managed Milvus — set MILVUS_ADDRESS and
+# MILVUS_TOKEN in backend/.env to a Zilliz Cloud cluster, whose free tier is
+# ample for this corpus and removes the 2-4GB Milvus/etcd/MinIO footprint.
+name: jobsync
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    environment:
+      # Resolves inside the compose network, so the backend is never public.
+      BACKEND_URL: http://backend:4000
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    volumes:
+      # Keeps the Adzuna call history and sync bookkeeping across restarts —
+      # without it a restart loop could spend a month's API allowance.
+      - backend_state:/app/data
+
+volumes:
+  caddy_data:
+  caddy_config:
+  backend_state:

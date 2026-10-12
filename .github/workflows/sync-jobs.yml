@@ -1,0 +1,54 @@
+name: Sync jobs from Adzuna
+
+# Runs off the web host on purpose: fetching and embedding a few hundred
+# postings needs real CPU, and free web tiers have very little of it (and no
+# cron). GitHub's runners have both.
+on:
+  schedule:
+    # 02:00 UTC daily. Pick a quiet hour; Adzuna's limits are per rolling window.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    inputs:
+      max_calls:
+        description: "Adzuna API calls to spend on this run"
+        required: false
+        default: "50"
+
+# Two syncs at once would double-spend the API allowance.
+concurrency:
+  group: sync-jobs
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Sync
+        working-directory: backend
+        env:
+          MILVUS_ADDRESS: ${{ secrets.MILVUS_ADDRESS }}
+          MILVUS_TOKEN: ${{ secrets.MILVUS_TOKEN }}
+          MILVUS_COLLECTION: ${{ secrets.MILVUS_COLLECTION }}
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          ADZUNA_COUNTRY: ${{ vars.ADZUNA_COUNTRY || 'us' }}
+          ADZUNA_MAX_AGE_DAYS: ${{ vars.ADZUNA_MAX_AGE_DAYS || '90' }}
+        # The runner is stateless, so the persisted Adzuna call history starts
+        # empty every time and can't be relied on to cap spending. --max-calls
+        # bounds each run on its own, which is what keeps the monthly 2,500
+        # within reach at roughly 50 a day.
+        run: npm run sync:jobs -- --max-calls=${{ github.event.inputs.max_calls || '50' }}
