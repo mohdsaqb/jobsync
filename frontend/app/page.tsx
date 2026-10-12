@@ -7,8 +7,8 @@ import UploadPanel from "@/components/UploadPanel";
 import ResultsPanel from "@/components/ResultsPanel";
 import ResumeSuggestions from "@/components/ResumeSuggestions";
 import BackgroundGlow from "@/components/BackgroundGlow";
-import { analyzeResume } from "@/lib/api";
-import type { JobMatch } from "@/lib/types";
+import { analyzeResume, type AnalyzeOptions } from "@/lib/api";
+import type { AnalyzeMeta, JobMatch } from "@/lib/types";
 
 type Screen = "upload" | "results" | "suggestions";
 
@@ -16,16 +16,18 @@ export default function Home() {
   const [screen, setScreen] = useState<Screen>("upload");
   const [matches, setMatches] = useState<JobMatch[] | null>(null);
   const [resumeText, setResumeText] = useState("");
+  const [meta, setMeta] = useState<AnalyzeMeta | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleUpload = async (file: File) => {
+  const handleUpload = async (file: File, hints: AnalyzeOptions = {}) => {
     setLoading(true);
     setError(null);
     try {
-      const results = await analyzeResume(file);
+      const results = await analyzeResume(file, hints);
       setMatches(results.matches);
       setResumeText(results.resumeText);
+      setMeta(results.meta ?? null);
       setScreen("results");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -37,6 +39,7 @@ export default function Home() {
   const handleNewAnalysis = () => {
     setMatches(null);
     setResumeText("");
+    setMeta(null);
     setError(null);
     setScreen("upload");
   };
@@ -76,7 +79,7 @@ export default function Home() {
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.25 }}
             >
-              <ResultsPanel matches={matches} onNewAnalysis={handleNewAnalysis} />
+              <ResultsPanel matches={matches} meta={meta} onNewAnalysis={handleNewAnalysis} />
             </motion.div>
           )}
         </AnimatePresence>

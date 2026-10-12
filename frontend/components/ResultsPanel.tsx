@@ -5,16 +5,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import JobCard from "./JobCard";
 import JobDetailModal from "./JobDetailModal";
-import type { JobMatch } from "@/lib/types";
+import type { AnalyzeMeta, JobMatch } from "@/lib/types";
 
 interface ResultsPanelProps {
   matches: JobMatch[];
+  meta?: AnalyzeMeta | null;
   onNewAnalysis: () => void;
 }
 
 const PAGE_SIZE = 20;
 
-export default function ResultsPanel({ matches, onNewAnalysis }: ResultsPanelProps) {
+export default function ResultsPanel({ matches, meta, onNewAnalysis }: ResultsPanelProps) {
   const [selectedJob, setSelectedJob] = useState<JobMatch | null>(null);
   const [page, setPage] = useState(1);
   const [direction, setDirection] = useState(0);
@@ -67,6 +68,11 @@ export default function ResultsPanel({ matches, onNewAnalysis }: ResultsPanelPro
               </>
             )}
           </p>
+          {meta?.warming && (
+            <p className="mt-2 text-xs text-indigo-300">
+              Pulling in fresh postings for that role — they&apos;ll show up next time you search.
+            </p>
+          )}
         </div>
         <button
           type="button"

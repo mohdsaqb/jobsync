@@ -13,3 +13,11 @@ export interface JobMatch {
   /** Epoch seconds the posting was published. */
   createdAt?: number;
 }
+
+export interface AnalyzeMeta {
+  /** A background fetch of fresh postings for the given role has started. */
+  warming: boolean;
+  /** Epoch seconds of the last scheduled sync, or null if none has run. */
+  lastSyncAt: number | null;
+  corpusSize: number | null;
+}

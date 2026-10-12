@@ -2,8 +2,10 @@ import fs from "node:fs/promises";
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { embedQuery } from "../services/embedding.service.js";
-import { searchJobs } from "../services/milvus.service.js";
+import { warmRole } from "../services/jobWarmer.js";
+import { countJobsCached, searchJobs } from "../services/milvus.service.js";
 import { extractSkills, skillOverlapScore } from "../services/skillMatch.service.js";
+import { readSyncState } from "../services/syncState.js";
 import { extractResumeText, TextExtractionError } from "../services/textExtraction.service.js";
 
 const MIN_MATCH_SCORE = 0.1;
@@ -11,6 +13,16 @@ const MIN_MATCH_SCORE = 0.1;
 // Final score blends semantic fit with explicit skill overlap (see skillMatch.service.ts).
 const SEMANTIC_WEIGHT = 0.6;
 const SKILL_WEIGHT = 0.4;
+
+const MAX_ROLE_LENGTH = 200;
+const MAX_LOCATION_LENGTH = 120;
+
+/** Optional free-text hints, ignored unless they're usable strings. */
+function optionalField(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed && trimmed.length <= maxLength ? trimmed : undefined;
+}
 
 export async function analyzeResume(req: Request, res: Response): Promise<void> {
   const file = req.file;
@@ -36,7 +48,22 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
 
     const relevantMatches = rescored.filter((match) => match.score > MIN_MATCH_SCORE);
 
-    res.json({ matches: relevantMatches, resumeText: text });
+    // Fetching from Adzuna takes several seconds, so it happens after this
+    // response rather than inside it — the postings land in the index for the
+    // next search instead of making this one slow.
+    const targetRole = optionalField(req.body?.targetRole, MAX_ROLE_LENGTH);
+    const location = optionalField(req.body?.location, MAX_LOCATION_LENGTH);
+    const warming = targetRole ? warmRole(targetRole, location) : false;
+
+    res.json({
+      matches: relevantMatches,
+      resumeText: text,
+      meta: {
+        warming,
+        lastSyncAt: readSyncState()?.lastSyncAt ?? null,
+        corpusSize: await countJobsCached(),
+      },
+    });
   } catch (err) {
     if (err instanceof TextExtractionError) {
       res.status(422).json({ error: err.message });

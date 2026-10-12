@@ -5,7 +5,7 @@ import { FileText, Image as ImageIcon, UploadCloud, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 interface UploadPanelProps {
-  onSubmit: (file: File) => void;
+  onSubmit: (file: File, hints: { targetRole?: string; location?: string }) => void;
   loading: boolean;
   error: string | null;
 }
@@ -23,6 +23,8 @@ export default function UploadPanel({ onSubmit, loading, error }: UploadPanelPro
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [sizeError, setSizeError] = useState<string | null>(null);
+  const [targetRole, setTargetRole] = useState("");
+  const [location, setLocation] = useState("");
   const [stepIndex, setStepIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -119,11 +121,43 @@ export default function UploadPanel({ onSubmit, loading, error }: UploadPanelPro
           )}
         </div>
 
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-zinc-400">
+              Target role <span className="text-zinc-600">(optional)</span>
+            </span>
+            <input
+              type="text"
+              value={targetRole}
+              onChange={(e) => setTargetRole(e.target.value)}
+              placeholder="e.g. Senior Frontend Developer"
+              maxLength={200}
+              className="rounded-xl border border-white/10 bg-zinc-950/50 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-400/60 focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-zinc-400">
+              Location <span className="text-zinc-600">(optional)</span>
+            </span>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Bengaluru"
+              maxLength={120}
+              className="rounded-xl border border-white/10 bg-zinc-950/50 px-3.5 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-400/60 focus:outline-none"
+            />
+          </label>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          Naming a role lets us pull in fresh postings for it — they&apos;ll appear in your next search.
+        </p>
+
         {(error || sizeError) && <p className="mt-4 text-sm text-red-400">{error ?? sizeError}</p>}
 
         <button
           type="button"
-          onClick={() => file && onSubmit(file)}
+          onClick={() => file && onSubmit(file, { targetRole, location })}
           disabled={!file || loading}
           className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-900 transition hover:bg-white disabled:cursor-not-allowed disabled:bg-zinc-700 disabled:text-zinc-400"
         >

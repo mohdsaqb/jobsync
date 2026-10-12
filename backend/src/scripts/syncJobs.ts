@@ -1,6 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { env } from "../config/env.js";
 import { isAdzunaConfigured, searchAdzuna, SYNC_QUERIES } from "../services/adzuna.service.js";
@@ -14,6 +11,7 @@ import {
   flushCollection,
   insertJobs,
 } from "../services/milvus.service.js";
+import { writeSyncState } from "../services/syncState.js";
 import type { JobDescription } from "../types/index.js";
 
 /**
@@ -37,8 +35,6 @@ const EMBED_BATCH = 50;
 // fetchAdzunaJobs script used 1.1s, which was over that ceiling.)
 const DELAY_MS = 2_500;
 
-const STATE_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/sync-state.json");
-
 function intArg(name: string, fallback: number): number {
   const raw = process.argv.find((a) => a.startsWith(`--${name}=`))?.split("=")[1];
   const parsed = Number(raw);
@@ -46,23 +42,6 @@ function intArg(name: string, fallback: number): number {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-interface SyncState {
-  lastSyncAt: number;
-  inserted: number;
-  evicted: number;
-  corpusSize: number;
-  callsUsed: number;
-}
-
-function writeState(state: SyncState): void {
-  try {
-    fs.mkdirSync(path.dirname(STATE_PATH), { recursive: true });
-    fs.writeFileSync(STATE_PATH, `${JSON.stringify(state, null, 2)}\n`);
-  } catch (err) {
-    console.error("Could not write sync state:", err);
-  }
-}
 
 async function main() {
   if (!isAdzunaConfigured()) {
@@ -150,7 +129,7 @@ async function main() {
   console.log(`Evicted ${evicted} posting(s) older than ${env.adzunaMaxAgeDays} days.`);
 
   const corpusSize = await countJobs();
-  writeState({
+  writeSyncState({
     lastSyncAt: Math.floor(Date.now() / 1000),
     inserted: toInsert.length,
     evicted,

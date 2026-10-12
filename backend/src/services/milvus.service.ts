@@ -147,6 +147,21 @@ export async function countJobs(): Promise<number> {
   return Number(result.data?.[0]?.["count(*)"] ?? 0);
 }
 
+let countCache: { at: number; value: number } | null = null;
+
+/**
+ * countJobs behind a short TTL, for the per-request corpus size. Background
+ * warms insert between syncs, so a figure recorded at sync time under-reports;
+ * a strongly consistent count on every request is more than this needs.
+ */
+export async function countJobsCached(ttlMs = 60_000): Promise<number> {
+  if (countCache && Date.now() - countCache.at < ttlMs) return countCache.value;
+
+  const value = await countJobs();
+  countCache = { at: Date.now(), value };
+  return value;
+}
+
 /**
  * Which of the supplied job ids are already indexed. Milvus has no uniqueness
  * constraint, so dedup before insert has to be explicit or postings arrive
