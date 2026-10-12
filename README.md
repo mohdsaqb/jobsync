@@ -5,13 +5,13 @@
 ![Express](https://img.shields.io/badge/Express-4-black?logo=express&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=white)
 ![Milvus](https://img.shields.io/badge/Milvus-vector%20search-00A1EA)
-![Gemini](https://img.shields.io/badge/Gemini-resume%20suggestions-8E75B2)
+![Groq](https://img.shields.io/badge/Groq-resume%20suggestions-F55036)
 
 **Upload a resume, get back semantically matched jobs — powered by local embeddings and vector search, with zero API cost or key required for the core matching path.**
 
 ## Overview
 
-JobSync is a full-stack resume-to-job matcher: upload a resume and it's ranked against a corpus of job descriptions by *meaning*, not keywords, using a local embedding model and a vector database. It's built as an end-to-end demonstration of a search product — file ingestion, ML inference, vector search, and an LLM-powered coaching feature — all wired together without depending on a paid embedding API for the part that matters most. The only external network call anywhere in the system is the optional Gemini-powered "improve your resume" feature.
+JobSync is a full-stack resume-to-job matcher: upload a resume and it's ranked against a corpus of job descriptions by *meaning*, not keywords, using a local embedding model and a vector database. It's built as an end-to-end demonstration of a search product — file ingestion, ML inference, vector search, and an LLM-powered coaching feature — all wired together without depending on a paid embedding API for the part that matters most. The only external network call anywhere in the system is the optional LLM-powered "improve your resume" feature.
 
 ## Problem Statement
 
@@ -19,7 +19,7 @@ Keyword-based search (what most ATS systems and job boards run on) misses roles 
 
 ## Solution
 
-Resume text is extracted, embedded into a vector, and compared against a pre-embedded job corpus using cosine similarity — so matching is based on overall meaning, not shared keywords. That semantic score is then blended with an explicit skill-overlap check to correct for cases where a resume's overall topic drifts from what a specific job actually asks for. On top of matching, a separate feature sends the resume and a target role to Gemini for concrete, role-specific improvement suggestions.
+Resume text is extracted, embedded into a vector, and compared against a pre-embedded job corpus using cosine similarity — so matching is based on overall meaning, not shared keywords. That semantic score is then blended with an explicit skill-overlap check to correct for cases where a resume's overall topic drifts from what a specific job actually asks for. On top of matching, a separate feature sends the resume and a target role to a fast hosted LLM for concrete, role-specific improvement suggestions.
 
 ## Key Features
 
@@ -27,7 +27,7 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 - **Local semantic embedding** — runs in-process on the backend, no API key or per-request cost
 - **Vector similarity search** — Milvus with an HNSW index, cosine similarity
 - **Skill-overlap rescoring** — corrects semantic drift by directly checking required-skill coverage
-- **AI resume coaching** — role-targeted, actionable suggestions via Gemini (optional)
+- **AI resume coaching** — role-targeted, actionable suggestions via Groq (optional, provider-swappable)
 - **Paginated, ranked results** with a bookmark toggle and a full-detail modal per job
 - **Resizable, collapsible sidebar** and a dark, glassmorphic UI
 
@@ -39,7 +39,7 @@ Concrete numbers from the shipped project — this is a demo/portfolio build wit
 - **384-dimension** embeddings (`bge-small-en-v1.5`, mean-pooled, L2-normalized)
 - Up to **1,024** candidate matches retrieved per search (Zilliz Cloud's serverless search-limit ceiling)
 - **5MB** upload limit, **3** supported input formats (PDF, PNG, JPEG)
-- **0** external API calls on the core matching path — Gemini is opt-in and suggestions-only
+- **0** external API calls on the core matching path — the LLM is opt-in and suggestions-only
 
 ## System Architecture
 
@@ -58,7 +58,7 @@ flowchart LR
         MIL[("Milvus / Zilliz<br/>Vector DB")]
     end
     subgraph External["External (optional)"]
-        GEM["Google Gemini API"]
+        GEM["Groq API"]
     end
 
     FE -->|"POST /api/resume/analyze"| API
@@ -88,7 +88,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as Backend
     participant M as Milvus
-    participant G as Gemini
+    participant G as Groq
 
     U->>F: Upload resume (PDF/PNG/JPG)
     F->>B: POST /api/resume/analyze
@@ -116,7 +116,8 @@ sequenceDiagram
 - **`milvus.service.ts`** — owns the collection schema (`job_id`, `title`, `company`, `description`, `embedding`) and an HNSW index with a COSINE metric. Clamps the search `limit` to 1024 to work around a Zilliz Cloud serverless quirk (see below).
 - **`skillMatch.service.ts`** — matches resume/job text against a curated keyword list with word-boundary-aware regex, and scores overlap as *(skills the resume has) / (skills the job asks for)*.
 - **`textExtraction.service.ts`** — reads a PDF's embedded text layer directly (`pdfjs-dist`); for images, runs Tesseract OCR.
-- **`aiSuggestions.service.ts`** — a thin Gemini wrapper with a fixed resume-coach system prompt, capped at 6 concrete suggestions per response.
+- **`aiSuggestions.service.ts`** — a thin wrapper over the configured LLM provider with a fixed resume-coach system prompt, capped at 6 concrete suggestions per response. The resume is truncated to 8,000 characters before sending, since Groq's free tier allows ~6,000 tokens per minute and a full-length resume would consume a whole minute's budget alone.
+- **`services/llm/`** — a one-method `LlmProvider` interface with Groq and Gemini implementations, selected by `LLM_PROVIDER`. Each provider normalises its own SDK errors into a shared `LlmApiError`, so the controller maps status codes without knowing which SDK threw.
 
 ## Technical Challenges & Solutions
 
@@ -134,7 +135,7 @@ sequenceDiagram
 | Embeddings | `@xenova/transformers` (local, in-process), `bge-small-en-v1.5`, 384 dimensions |
 | Text extraction | `pdfjs-dist` (PDF text layer), `tesseract.js` (OCR for images) |
 | Vector database | Milvus (Docker Compose) or Zilliz Cloud — HNSW index, cosine similarity |
-| AI suggestions | Google Gemini (`@google/genai`, `gemini-flash-latest`) |
+| AI suggestions | Groq (`groq-sdk`, `openai/gpt-oss-120b`) — swappable to Google Gemini via `LLM_PROVIDER` |
 | Infra | Docker Compose (etcd, MinIO, Milvus standalone) |
 
 ## Project Structure
@@ -153,7 +154,8 @@ backend/
       embedding.service.ts      # local embedding model
       milvus.service.ts         # Milvus collection + search
       skillMatch.service.ts     # keyword skill-overlap scoring
-      aiSuggestions.service.ts  # Gemini API call
+      aiSuggestions.service.ts  # prompt + truncation, delegates to llm/
+      llm/                      # LlmProvider interface + Groq and Gemini providers
     scripts/
       generateJobs.ts           # generates data/jobs.json (role templates)
       fetchAdzunaJobs.ts        # appends real postings from the Adzuna API
@@ -206,7 +208,7 @@ JSON body: `{ "resumeText": string, "targetRole": string }` (resume ≤20,000 ch
 
 Response `200`: `{ "suggestions": "..." }`
 
-Errors: `400` missing/empty/too-long field · `503` `GEMINI_API_KEY` not configured · `502` Gemini rejected the key, rate-limited, or otherwise failed · `500` unexpected failure.
+Errors: `400` missing/empty/too-long field · `503` the active provider's API key not configured · `502` the provider rejected the key, rate-limited, or otherwise failed · `500` unexpected failure.
 
 ## Getting Started / Installation
 
@@ -246,13 +248,15 @@ npm run seed   # embeds and inserts the job descriptions into Milvus (one-time)
 
 The repo ships with `backend/src/data/jobs.json` already populated with 10,005 job descriptions across software/tech, core engineering, and non-tech roles — so `npm run seed` has a large, varied pool to match resumes against out of the box.
 
-**To enable AI resume suggestions**, add a Gemini API key to `backend/.env`:
+**To enable AI resume suggestions**, add a Groq API key to `backend/.env`:
 
 ```
-GEMINI_API_KEY=...
+GROQ_API_KEY=...
 ```
 
-Get a free key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey). This is optional — matching, OCR, and embeddings all work without it. Without a key, the "Improve your resume" section shows a message that it isn't configured yet, instead of erroring.
+Get a free key at [console.groq.com/keys](https://console.groq.com/keys) — no credit card required. This is optional: matching, OCR, and embeddings all work without it, and the "Improve your resume" section shows a not-configured message instead of erroring.
+
+To use Google Gemini instead, set `LLM_PROVIDER=gemini` and supply `GEMINI_API_KEY` ([free key](https://aistudio.google.com/apikey)).
 
 To regenerate the job pool or start over:
 
@@ -288,7 +292,7 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 - Jobs scoring **10% or below** are filtered out server-side, so you won't see irrelevant postings.
 - Click any **job card** to open its full posting in a modal, with the same Save/Apply actions.
 - Each job has a working **bookmark toggle** (persisted in `localStorage`). **Apply** is a demo affordance — postings are synthetic, so it shows a note instead of linking anywhere real.
-- The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from Gemini — missing keywords, weak bullets, structural issues.
+- The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
 
 ## Testing
 
@@ -298,7 +302,7 @@ There's no automated test suite yet (see Future Improvements) — verify changes
 2. `cd frontend && npx tsc --noEmit && npm run build` — same for the frontend.
 3. With both dev servers running, upload a resume and confirm ranked matches appear.
 4. Open a job card, toggle its bookmark, and confirm it persists across a page reload.
-5. Enter a target role in the suggestions panel and confirm Gemini returns formatted, role-specific feedback (requires `GEMINI_API_KEY`).
+5. Enter a target role in the suggestions panel and confirm the LLM returns formatted, role-specific feedback (requires `GROQ_API_KEY`).
 
 ## Future Improvements
 
