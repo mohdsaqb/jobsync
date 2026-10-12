@@ -11,4 +11,11 @@ export const env = {
   frontendOrigin: process.env.FRONTEND_ORIGIN,
   // "groq" (default) or "gemini" — see services/llm/.
   llmProvider: process.env.LLM_PROVIDER ?? "groq",
+  adzunaAppId: process.env.ADZUNA_APP_ID,
+  adzunaAppKey: process.env.ADZUNA_APP_KEY,
+  adzunaCountry: process.env.ADZUNA_COUNTRY ?? "us",
+  adzunaPagesPerQuery: Number(process.env.ADZUNA_PAGES_PER_QUERY ?? 2),
+  // Postings older than this are skipped at ingest — Adzuna returns listings
+  // years old, and stale jobs are worse than fewer jobs.
+  adzunaMaxAgeDays: Number(process.env.ADZUNA_MAX_AGE_DAYS ?? 90),
 };
