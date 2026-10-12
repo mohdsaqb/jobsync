@@ -9,4 +9,6 @@ export const env = {
   embeddingDim: Number(process.env.EMBEDDING_DIM ?? 384),
   topK: Number(process.env.TOP_K ?? 10000),
   frontendOrigin: process.env.FRONTEND_ORIGIN,
+  // "groq" (default) or "gemini" — see services/llm/.
+  llmProvider: process.env.LLM_PROVIDER ?? "groq",
 };

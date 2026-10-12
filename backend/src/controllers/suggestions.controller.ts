@@ -1,6 +1,6 @@
-import { ApiError } from "@google/genai";
 import type { Request, Response } from "express";
-import { generateResumeSuggestions, MissingApiKeyError } from "../services/aiSuggestions.service.js";
+import { generateResumeSuggestions, LLM_KEY_ENV_VAR, MissingApiKeyError } from "../services/aiSuggestions.service.js";
+import { LlmApiError } from "../services/llm/index.js";
 
 const MAX_RESUME_LENGTH = 20000;
 const MAX_ROLE_LENGTH = 200;
@@ -31,21 +31,23 @@ export async function suggestResumeImprovements(req: Request, res: Response): Pr
   } catch (err) {
     if (err instanceof MissingApiKeyError) {
       res.status(503).json({
-        error: "AI suggestions aren't configured yet — add a GEMINI_API_KEY to backend/.env and restart the server.",
+        error: `AI suggestions aren't configured yet — add a ${LLM_KEY_ENV_VAR} to backend/.env and restart the server.`,
       });
       return;
     }
-    if (err instanceof ApiError) {
-      console.error("Gemini API error:", err);
+    if (err instanceof LlmApiError) {
+      console.error("LLM API error:", err);
       if (err.status === 401 || err.status === 403) {
-        res.status(502).json({ error: "The configured GEMINI_API_KEY was rejected. Double-check it in backend/.env." });
+        res
+          .status(502)
+          .json({ error: `The configured ${LLM_KEY_ENV_VAR} was rejected. Double-check it in backend/.env.` });
         return;
       }
       if (err.status === 429) {
-        res.status(502).json({ error: "Gemini's rate limit was reached. Please wait a moment and try again." });
+        res.status(502).json({ error: "The AI provider's rate limit was reached. Please wait a moment and try again." });
         return;
       }
-      // Not necessarily transient — surface Gemini's own message rather than a generic one.
+      // Not necessarily transient — surface the provider's own message rather than a generic one.
       res.status(502).json({ error: `AI suggestions are unavailable: ${err.message}` });
       return;
     }

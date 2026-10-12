@@ -2,6 +2,7 @@ import cors from "cors";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { env } from "./config/env.js";
 import { resumeRouter } from "./routes/resume.routes.js";
+import { LLM_KEY_ENV_VAR } from "./services/aiSuggestions.service.js";
 import { ensureCollection } from "./services/milvus.service.js";
 
 // The Milvus SDK rejects promises internally during connection retries; without
@@ -25,9 +26,9 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 async function start() {
-  if (!process.env.GEMINI_API_KEY) {
+  if (!process.env[LLM_KEY_ENV_VAR]) {
     console.warn(
-      "GEMINI_API_KEY is not set — AI resume suggestions will be unavailable until you add one to backend/.env.",
+      `${LLM_KEY_ENV_VAR} is not set — AI resume suggestions will be unavailable until you add one to backend/.env.`,
     );
   }
 

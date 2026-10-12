@@ -21,8 +21,8 @@ function renderInline(text: string) {
   );
 }
 
-// Gemini returns markdown-ish text; its shape is predictable enough that this
-// small formatter beats pulling in a markdown library.
+// The model returns markdown-ish text; its shape is predictable enough that
+// this small formatter beats pulling in a markdown library.
 function SuggestionsContent({ text }: { text: string }) {
   const blocks = text.trim().split(/\n{2,}/);
 
@@ -33,7 +33,10 @@ function SuggestionsContent({ text }: { text: string }) {
           .split("\n")
           .map((line) => line.trim())
           .filter(Boolean);
-        const numberedMatch = lines[0]?.match(/^(\d+)\.\s+(.*)/);
+        // Accepts both "1. Heading" and "**1. Heading**" — providers differ on
+        // whether they bold the heading, and the numbered layout below is worth
+        // keeping either way.
+        const numberedMatch = lines[0]?.match(/^\*{0,2}(\d+)\.\s+(.*?)\*{0,2}$/);
 
         if (numberedMatch) {
           const [, number, heading] = numberedMatch;
