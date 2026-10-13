@@ -5,14 +5,14 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "JobSync",
-  description: "Upload your resume and get semantically matched job recommendations.",
+  title: "JobSync — AI Career Workspace",
+  description: "Upload your resume to discover matching roles and get targeted application advice.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} dark`}>
-      <body className="bg-zinc-950 font-sans antialiased">{children}</body>
+    <html lang="en" className={inter.variable}>
+      <body className="bg-canvas font-sans text-ink antialiased">{children}</body>
     </html>
   );
 }

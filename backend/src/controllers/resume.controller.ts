@@ -42,7 +42,19 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
       .map((match) => {
         const jobSkills = extractSkills(`${match.title} ${match.description}`);
         const overlap = skillOverlapScore(resumeSkills, jobSkills);
-        return { ...match, score: SEMANTIC_WEIGHT * match.score + SKILL_WEIGHT * overlap };
+        // Returned so the UI can explain a match rather than only show a number.
+        const matchedSkills: string[] = [];
+        const unmatchedSkills: string[] = [];
+        for (const skill of jobSkills) {
+          (resumeSkills.has(skill) ? matchedSkills : unmatchedSkills).push(skill);
+        }
+
+        return {
+          ...match,
+          score: SEMANTIC_WEIGHT * match.score + SKILL_WEIGHT * overlap,
+          matchedSkills: matchedSkills.sort(),
+          unmatchedSkills: unmatchedSkills.sort(),
+        };
       })
       .sort((a, b) => b.score - a.score);
 
@@ -58,6 +70,7 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
     res.json({
       matches: relevantMatches,
       resumeText: text,
+      resumeSkills: [...resumeSkills].sort(),
       meta: {
         warming,
         lastSyncAt: readSyncState()?.lastSyncAt ?? null,

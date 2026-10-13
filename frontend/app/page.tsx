@@ -1,89 +1,179 @@
 "use client";
 
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import Sidebar from "@/components/Sidebar";
-import UploadPanel from "@/components/UploadPanel";
-import ResultsPanel from "@/components/ResultsPanel";
-import ResumeSuggestions from "@/components/ResumeSuggestions";
-import BackgroundGlow from "@/components/BackgroundGlow";
-import { analyzeResume, type AnalyzeOptions } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import AppShell from "@/components/shell/AppShell";
+import JobsWorkspace from "@/components/workspaces/JobsWorkspace";
+import ResumeWorkspace, { type ResumeResult } from "@/components/workspaces/ResumeWorkspace";
+import SuggestionsWorkspace from "@/components/workspaces/SuggestionsWorkspace";
+import { analyzeResume, getResumeSuggestions, type AnalyzeOptions } from "@/lib/api";
 import type { AnalyzeMeta, JobMatch } from "@/lib/types";
+import type { Workspace } from "@/lib/workspace";
 
-type Screen = "upload" | "results" | "suggestions";
+const WORKSPACES: Workspace[] = ["resume", "jobs", "suggestions"];
+
+function workspaceFromHash(): Workspace | null {
+  if (typeof window === "undefined") return null;
+  const candidate = window.location.hash.replace("#", "") as Workspace;
+  return WORKSPACES.includes(candidate) ? candidate : null;
+}
 
 export default function Home() {
-  const [screen, setScreen] = useState<Screen>("upload");
+  const [workspace, setWorkspace] = useState<Workspace>("resume");
+
   const [matches, setMatches] = useState<JobMatch[] | null>(null);
   const [resumeText, setResumeText] = useState("");
+  const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
   const [meta, setMeta] = useState<AnalyzeMeta | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
-  const handleUpload = async (file: File, hints: AnalyzeOptions = {}) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const results = await analyzeResume(file, hints);
-      setMatches(results.matches);
-      setResumeText(results.resumeText);
-      setMeta(results.meta ?? null);
-      setScreen("results");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setLoading(false);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+
+  const [suggestions, setSuggestions] = useState<{ text: string; forLabel: string } | null>(null);
+  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  const lastSubmission = useRef<{ file: File; hints: AnalyzeOptions } | null>(null);
+
+  /**
+   * The workspace lives in the URL hash so browser back/forward move between
+   * steps instead of leaving the app. A refresh keeps the hash but loses the
+   * in-memory results, which each workspace already handles with a
+   * "upload a resume first" state.
+   */
+  const go = useCallback((next: Workspace) => {
+    setWorkspace(next);
+    if (typeof window !== "undefined" && workspaceFromHash() !== next) {
+      window.history.pushState({ workspace: next }, "", `#${next}`);
     }
-  };
+  }, []);
 
-  const handleNewAnalysis = () => {
+  useEffect(() => {
+    const fromHash = workspaceFromHash();
+    if (fromHash) setWorkspace(fromHash);
+
+    const onPopState = () => setWorkspace(workspaceFromHash() ?? "resume");
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const runAnalysis = useCallback(
+    async (file: File, hints: AnalyzeOptions) => {
+      lastSubmission.current = { file, hints };
+      setAnalyzing(true);
+      setAnalyzeError(null);
+      try {
+        const result = await analyzeResume(file, hints);
+        setMatches(result.matches);
+        setResumeText(result.resumeText);
+        setMeta(result.meta ?? null);
+        setResumeResult({
+          matchCount: result.matches.length,
+          resumeSkills: result.resumeSkills,
+          resumeChars: result.resumeText.length,
+          warming: result.meta?.warming ?? false,
+        });
+        // A new resume invalidates the previous selection and advice.
+        setSelectedJobId(null);
+        setSuggestions(null);
+        setSuggestError(null);
+      } catch (err) {
+        setAnalyzeError(err instanceof Error ? err.message : "Something went wrong.");
+      } finally {
+        setAnalyzing(false);
+      }
+    },
+    [],
+  );
+
+  const reset = useCallback(() => {
     setMatches(null);
     setResumeText("");
+    setResumeResult(null);
     setMeta(null);
-    setError(null);
-    setScreen("upload");
-  };
+    setAnalyzeError(null);
+    setSelectedJobId(null);
+    setSuggestions(null);
+    setSuggestError(null);
+    lastSubmission.current = null;
+    go("resume");
+  }, [go]);
+
+  const generate = useCallback(
+    async (role: string) => {
+      const target = role.trim();
+      if (!target || !resumeText) return;
+
+      setGeneratingFor(target);
+      setSuggestError(null);
+      try {
+        const text = await getResumeSuggestions(resumeText, target);
+        setSuggestions({ text, forLabel: target });
+      } catch (err) {
+        setSuggestions(null);
+        setSuggestError(err instanceof Error ? err.message : "Something went wrong.");
+      } finally {
+        setGeneratingFor(null);
+      }
+    },
+    [resumeText],
+  );
+
+  const selectedJob = matches?.find((job) => job.jobId === selectedJobId) ?? null;
+  const hasResults = matches !== null;
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-zinc-950 text-zinc-100">
-      <BackgroundGlow />
-      <Sidebar screen={screen} hasResults={matches !== null} onSelect={setScreen} />
-      <main className="relative z-0 flex-1 overflow-y-auto px-6 py-10 sm:px-10">
-        <AnimatePresence mode="wait">
-          {screen === "upload" || !matches ? (
-            <motion.div
-              key="upload"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
-            >
-              <UploadPanel onSubmit={handleUpload} loading={loading} error={error} />
-            </motion.div>
-          ) : screen === "suggestions" ? (
-            <motion.div
-              key="suggestions"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
-              className="mx-auto max-w-3xl"
-            >
-              <ResumeSuggestions resumeText={resumeText} />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="results"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25 }}
-            >
-              <ResultsPanel matches={matches} meta={meta} onNewAnalysis={handleNewAnalysis} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
-    </div>
+    <AppShell
+      current={workspace}
+      onNavigate={go}
+      matchCount={matches?.length ?? null}
+      selectedJobTitle={selectedJob?.title ?? null}
+      hasResults={hasResults}
+      resumeFailed={analyzeError !== null}
+      meta={meta}
+      busy={analyzing}
+    >
+      {workspace === "resume" && (
+        <ResumeWorkspace
+          loading={analyzing}
+          error={analyzeError}
+          result={resumeResult}
+          onSubmit={runAnalysis}
+          onContinue={() => go("jobs")}
+          onReset={reset}
+        />
+      )}
+
+      {workspace === "jobs" && (
+        <JobsWorkspace
+          matches={matches}
+          meta={meta}
+          loading={analyzing}
+          error={analyzeError}
+          selectedJobId={selectedJobId}
+          onSelectJob={setSelectedJobId}
+          onGetSuggestions={() => go("suggestions")}
+          onGoToResume={() => go("resume")}
+          onRetry={() => {
+            const last = lastSubmission.current;
+            if (last) void runAnalysis(last.file, last.hints);
+            else go("resume");
+          }}
+        />
+      )}
+
+      {workspace === "suggestions" && (
+        <SuggestionsWorkspace
+          job={selectedJob}
+          hasResults={hasResults}
+          suggestions={suggestions}
+          generatingFor={generatingFor}
+          error={suggestError}
+          onGenerate={generate}
+          onGoToJobs={() => go("jobs")}
+          onGoToResume={() => go("resume")}
+        />
+      )}
+    </AppShell>
   );
 }

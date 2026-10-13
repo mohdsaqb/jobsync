@@ -3,6 +3,8 @@ import type { AnalyzeMeta, JobMatch } from "./types";
 interface AnalyzeResumeResult {
   matches: JobMatch[];
   resumeText: string;
+  /** Tracked skills detected in the resume; empty when none were recognised. */
+  resumeSkills: string[];
   meta?: AnalyzeMeta;
 }
 
@@ -32,6 +34,7 @@ export async function analyzeResume(file: File, options: AnalyzeOptions = {}): P
   return {
     matches: body.matches as JobMatch[],
     resumeText: body.resumeText as string,
+    resumeSkills: (body.resumeSkills as string[] | undefined) ?? [],
     meta: body.meta as AnalyzeMeta | undefined,
   };
 }

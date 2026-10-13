@@ -30,7 +30,7 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 - **Skill-overlap rescoring** — corrects semantic drift by directly checking required-skill coverage
 - **AI resume coaching** — role-targeted, actionable suggestions via Groq (optional, provider-swappable)
 - **Paginated, ranked results** with a bookmark toggle and a full-detail modal per job
-- **Resizable, collapsible sidebar** and a dark, glassmorphic UI
+- **Three-step workspace** — resume, matched jobs, AI suggestions — behind one persistent task panel, in a light, minimal SaaS interface
 
 ## Key Metrics / Results
 
@@ -135,7 +135,7 @@ sequenceDiagram
 
 | Layer | Technology |
 |---|---|
-| Frontend | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, Framer Motion, lucide-react |
+| Frontend | Next.js 15 (App Router), React 18, TypeScript, Tailwind CSS, lucide-react |
 | Backend | Node.js, Express 4, TypeScript |
 | Embeddings | `@xenova/transformers` (local, in-process), `bge-small-en-v1.5`, 384 dimensions |
 | Text extraction | `pdfjs-dist` (PDF text layer), `tesseract.js` (OCR for images) |
@@ -301,12 +301,14 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 
 **UI tour:**
 
-- The **sidebar** is a real resizable panel — drag its right edge, or drag past a threshold and release to snap into an icon-only rail.
-- Upload a resume and the view transitions into a **results screen**, 20 matches per page, with Prev/Next and a jump-to-page control.
-- Jobs scoring **10% or below** are filtered out server-side, so you won't see irrelevant postings.
-- Click any **job card** to open its full posting in a modal, with the same Save/Apply actions.
-- Each job has a working **bookmark toggle** (persisted in `localStorage`), and **Apply** opens the real posting on Adzuna.
-- The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
+- A **persistent task panel** holds the three workspaces. Steps that need a resume stay disabled until one is uploaded rather than failing when opened, and the step marker only shows complete once an analysis has actually run.
+- The workspace is reflected in the URL hash, so **browser back and forward** move between steps. A refresh keeps the step and shows its "upload a resume first" state, since results are held in memory only.
+- **Resume upload** reports its own lifecycle: file selected, analyzing, ready, or failed. The ready state lists the skills detected in your resume and the number of matches before you move on.
+- **Matched jobs** is a split pane — list on the left, full posting on the right. Search by title or company, filter by location, date posted or whether a salary is listed, and sort by match or recency. All of it operates on the result set the API returned.
+- Each job shows location, salary and posting age **when the source provides them**; synthetic records simply show fewer facts rather than placeholders. **Apply** opens the real posting, and the bookmark persists in `localStorage`.
+- **Match scores** are presented as a similarity reading with a label, alongside the specific skills the posting shares with your resume and the ones it doesn't — so the number is explained rather than just displayed.
+- **AI suggestions** carry the selected job as context, split the model's output into items you can copy or mark reviewed, and sit next to a keyword skill comparison drawn from the actual posting.
+- Jobs scoring **0.1 or below** are filtered out server-side, so irrelevant postings never reach the list.
 
 ## Deployment
 

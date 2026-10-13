@@ -12,6 +12,10 @@ export interface JobMatch {
   salaryMax?: number;
   /** Epoch seconds the posting was published. */
   createdAt?: number;
+  /** Skills this job asks for that the resume also mentions. */
+  matchedSkills?: string[];
+  /** Skills this job asks for with no counterpart in the resume. */
+  unmatchedSkills?: string[];
 }
 
 export interface AnalyzeMeta {
