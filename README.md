@@ -141,7 +141,7 @@ sequenceDiagram
 | Text extraction | `pdfjs-dist` (PDF text layer), `tesseract.js` (OCR for images) |
 | Vector database | Milvus (Docker Compose) or Zilliz Cloud — HNSW index, cosine similarity |
 | AI suggestions | Groq (`groq-sdk`, `openai/gpt-oss-120b`) — swappable to Google Gemini via `LLM_PROVIDER` |
-| Infra | Docker Compose (etcd, MinIO, Milvus standalone) locally; Caddy + Zilliz Cloud in production |
+| Infra | Docker Compose (etcd, MinIO, Milvus standalone) locally; Vercel + Render + Zilliz Cloud in production |
 | Scheduled jobs | GitHub Actions (daily Adzuna sync, off the web host) |
 
 ## Project Structure
@@ -310,60 +310,45 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 
 ## Deployment
 
-The app is designed to run on free infrastructure and stay warm — no spin-down pause, no cold start on the first visit.
+Running on free tiers, with no spin-down pause for visitors.
 
-### What runs where
+| Layer | Where |
+|---|---|
+| Frontend | Vercel (Hobby) |
+| Backend | Render (free web service) |
+| Vector DB | Zilliz Cloud (free cluster) |
+| Scheduled job sync | GitHub Actions |
+| Monitoring + keep-awake | UptimeRobot |
 
-| Layer | Choice | Cost |
-|---|---|---|
-| Vector DB | Zilliz Cloud free cluster (5GB; suspends only after 7 days idle, which the monitor below prevents) | $0 |
-| Backend + frontend | Any always-on host, behind Caddy for TLS | $0 on a free VM |
-| Scheduled job sync | GitHub Actions | $0 |
-| Job data | Adzuna free tier | $0 |
-| LLM | Groq free tier | $0 |
-| TLS + hostname | Caddy with Let's Encrypt, over a free DuckDNS subdomain | $0 |
-| Monitoring | UptimeRobot | $0 |
+The frontend proxies `/api/*` to the backend via `next.config.mjs`, so set `BACKEND_URL` on Vercel to the Render URL, and `FRONTEND_ORIGIN` on Render to the Vercel URL so CORS is restricted in production.
 
-**Sizing matters more than the provider.** The embedding model runs in-process, so the backend sits around 400–600MB resident and spikes higher during image OCR. A 512MB free tier is not enough; budget 1GB or more, and measure it on your own resumes before committing to a host.
+### Keeping the backend warm
 
-### Deploy
+Render free web services spin down after 15 minutes without traffic and take around a minute to wake, which the Vercel proxy would otherwise wait on. A single **UptimeRobot** HTTP monitor on `https://<backend>.onrender.com/health` every 5 minutes keeps it up.
 
-```bash
-# On the server, with Docker and the compose plugin installed:
-git clone https://github.com/mohdsaqb/jobsync.git && cd jobsync
-cp backend/.env.example backend/.env    # then fill in the keys below
-$EDITOR Caddyfile                       # replace the hostname with yours
-docker compose -f docker-compose.prod.yml up -d --build
-```
+That one monitor does three jobs:
 
-`backend/.env` needs `MILVUS_ADDRESS` and `MILVUS_TOKEN` (your Zilliz cluster), `GROQ_API_KEY`, `ADZUNA_APP_ID` / `ADZUNA_APP_KEY`, and `FRONTEND_ORIGIN=https://your-host` so CORS is restricted in production.
+1. **Prevents the spin-down**, so no visitor pays the wake-up cost.
+2. **Alerts on real failure.** `/health` checks Milvus rather than just confirming the process is alive:
+   ```json
+   { "status": "ok", "milvus": "ok", "corpusSize": 1842, "lastSyncAt": 1791839891 }
+   ```
+   It returns **503** with `"status": "degraded"` when Milvus is unreachable, so the monitor goes red while `/analyze` is genuinely broken — a plain liveness ping would have stayed green. The probe is cached for 30 seconds, so 5-minute polling costs nothing.
+3. **Keeps Zilliz warm.** Free clusters suspend after 7 days idle, and because `/health` touches Milvus, the pings prevent that too.
 
-Only Caddy publishes ports. The backend is reachable solely from the frontend container over the compose network, and the frontend proxies `/api/*` to it, so the API is never exposed directly.
+Two limits worth knowing. Render's free tier allows **750 instance-hours/month** and running 24/7 costs ~744, so exactly one always-on service fits — adding a second would exhaust it. And the backend peaks at roughly **420MB resident** against Render's 512MB ceiling, mostly the in-process embedding model; image uploads are the tight path, since Tesseract OCR runs in a separate worker process on top of that.
 
-The backend image bakes in the embedding model and Tesseract's language data at build time. Without that, the first visitor after each deploy waits on a ~34MB download — a cold start by another name on an "always-on" box. The image is roughly 1GB as a result, most of it the ONNX and OCR runtimes.
+### Cold start beyond the host
+
+Keeping the dyno awake isn't the whole story. The embedding model is lazily loaded, so `npm run build` also prefetches it (and Tesseract's language data) into the build output, and the server loads it at startup before accepting traffic. Without both, the first upload after each deploy waited on a ~34MB download: measured at 7.2s versus 0.34s once warm. A prefetch failure is non-fatal and falls back to downloading on first request.
+
+`backend/Dockerfile` and `frontend/Dockerfile` are included for running this anywhere that takes a container image; neither is needed for the Vercel/Render setup above.
 
 ### Keeping the job corpus fresh
 
-`.github/workflows/sync-jobs.yml` runs the sync daily on GitHub's runners rather than the web host, because embedding a few hundred postings needs real CPU and free web tiers have little of it — and no cron. Add these repository secrets: `MILVUS_ADDRESS`, `MILVUS_TOKEN`, `MILVUS_COLLECTION`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, plus optional variables `ADZUNA_COUNTRY` and `ADZUNA_MAX_AGE_DAYS`.
+`.github/workflows/sync-jobs.yml` runs the Adzuna sync daily on GitHub's runners rather than on Render — free web services have no cron, and embedding a few hundred postings needs more CPU than the free tier provides. Add these repository secrets: `MILVUS_ADDRESS`, `MILVUS_TOKEN`, `MILVUS_COLLECTION`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, plus optional variables `ADZUNA_COUNTRY` and `ADZUNA_MAX_AGE_DAYS`.
 
 Each run is capped with `--max-calls` because the runner is stateless: the persisted Adzuna call history starts empty every time, so the cap is what keeps spending inside the monthly 2,500.
-
-### Monitoring with UptimeRobot
-
-Create one free HTTP monitor on `https://your-host/health`, every 5 minutes, with email alerts. It does two jobs:
-
-- **Alerting** — you find out the stack is down without opening the site.
-- **Keeping Zilliz awake** — free clusters suspend after 7 days idle, and regular traffic prevents that.
-
-`/health` deliberately checks its dependency rather than only confirming the process is alive:
-
-```json
-{ "status": "ok", "milvus": "ok", "corpusSize": 1842, "lastSyncAt": 1791839891 }
-```
-
-It returns **503** with `"status": "degraded"` when Milvus is unreachable, so the monitor goes red while `/analyze` is genuinely broken — a plain liveness ping would have stayed green. The dependency probe is cached for 30 seconds, so five-minute polling costs nothing.
-
-One caveat worth stating plainly: pinging every 5 minutes prevents a host's *idle spin-down*, but it does not satisfy providers that reclaim under-utilised instances against CPU and memory thresholds — a HEAD request every five minutes leaves those far below any such floor. Check your provider's specific policy rather than assuming the pings cover it.
 
 ## Testing
 

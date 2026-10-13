@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && (node dist/scripts/prefetchModels.js || echo 'Model prefetch failed; it will download on first request instead.')",
     "start": "node dist/server.js",
     "seed": "tsx src/scripts/seedJobs.ts",
     "seed:reset": "tsx src/scripts/seedJobs.ts --reset",
