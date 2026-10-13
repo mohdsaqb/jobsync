@@ -344,6 +344,30 @@ Keeping the dyno awake isn't the whole story. The embedding model is lazily load
 
 `backend/Dockerfile` and `frontend/Dockerfile` are included for running this anywhere that takes a container image; neither is needed for the Vercel/Render setup above.
 
+### Migrating the deployed database
+
+The job schema gained `url`, `location`, `salary_min`, `salary_max` and `created_at`, and **Milvus cannot add fields to an existing collection**. `ensureCollection` therefore refuses to start against a collection that predates them, naming the missing fields. That check is deliberate — the alternative was failing later, on insert and search, with errors that pointed nowhere near the cause.
+
+So a deployed instance has to migrate before it runs this code. Order matters:
+
+1. **Build the new collection** from a machine with the production credentials in `backend/.env`:
+   ```bash
+   cd backend
+   MILVUS_COLLECTION=job_descriptions_v2 ADZUNA_SYNC_DAILY=150 \
+     npm run sync:jobs -- --max-calls=150
+   ```
+   This creates it with the current schema and fills it with real postings. A one-time bootstrap is worth spending more of the daily allowance on; Adzuna's own four windows still apply, so the most this can take is 150 of the day's 250.
+
+2. **Check it looks right** — `npm run sync:jobs` prints the corpus size, and a second run should report everything as already indexed.
+
+3. **Point the service at it**: set `MILVUS_COLLECTION=job_descriptions_v2` in the Render dashboard **before deploying**. Doing it after means the new code starts against the old collection and fails its schema check.
+
+4. **Deploy.**
+
+5. **Once satisfied**, drop the old collection in Zilliz to reclaim the space.
+
+Expect the corpus to be smaller than the synthetic set it replaces: a 150-call bootstrap yields roughly 1,000–3,000 unique postings depending on the queries, against 10,005 synthetic ones. It grows with each daily sync, and every posting is real and applyable. Widening `ADZUNA_MAX_AGE_DAYS` trades freshness for volume.
+
 ### Keeping the job corpus fresh
 
 `.github/workflows/sync-jobs.yml` runs the Adzuna sync daily on GitHub's runners rather than on Render — free web services have no cron, and embedding a few hundred postings needs more CPU than the free tier provides. Add these repository secrets: `MILVUS_ADDRESS`, `MILVUS_TOKEN`, `MILVUS_COLLECTION`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, plus optional variables `ADZUNA_COUNTRY` and `ADZUNA_MAX_AGE_DAYS`.

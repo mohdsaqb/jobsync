@@ -27,16 +27,21 @@ const WINDOWS = {
   month: { ms: 30 * DAY, limit: 2500 },
 } as const;
 
+export type AdzunaChannel = "sync" | "live";
+
 /**
  * Daily sub-caps per consumer, so the scheduled corpus sync can't starve the
- * on-demand path (or vice versa). These sum to well under the sustainable ~83.
+ * on-demand path (or vice versa). The defaults sum to well under the
+ * sustainable ~83/day.
+ *
+ * Raised via env for a one-time corpus bootstrap, where spending a few hundred
+ * calls in a day is worth it. The four windows above are the real guard rails
+ * and are not configurable — those are Adzuna's own limits.
  */
-const CHANNEL_DAILY_LIMITS = {
-  sync: 50,
-  live: 30,
-} as const;
-
-export type AdzunaChannel = keyof typeof CHANNEL_DAILY_LIMITS;
+const CHANNEL_DAILY_LIMITS: Record<AdzunaChannel, number> = {
+  sync: Number(process.env.ADZUNA_SYNC_DAILY ?? 50),
+  live: Number(process.env.ADZUNA_LIVE_DAILY ?? 30),
+};
 
 const STATE_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
