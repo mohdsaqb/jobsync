@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "JobSync — AI Career Workspace",
-  description: "Upload your resume to discover matching roles and get targeted application advice.",
+  title: "JobSync",
+  description: "Upload your resume to find matching jobs.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

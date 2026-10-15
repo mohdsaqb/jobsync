@@ -34,16 +34,3 @@ export function formatPostedAge(createdAt?: number, now = Date.now()): string | 
   return `${Math.floor(days / 30)}mo ago`;
 }
 
-/** "updated 3h ago" for the corpus freshness line. */
-export function formatSyncAge(lastSyncAt?: number | null, now = Date.now()): string | null {
-  if (!lastSyncAt || lastSyncAt <= 0) return null;
-
-  const minutes = Math.floor((now / 1000 - lastSyncAt) / 60);
-  if (minutes < 0) return null;
-  if (minutes < 2) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}

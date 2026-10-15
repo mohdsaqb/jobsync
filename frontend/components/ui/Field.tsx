@@ -5,7 +5,7 @@ import { useId } from "react";
 import { cn } from "@/lib/cn";
 
 const CONTROL =
-  "w-full rounded-lg border border-hairline bg-surface text-sm text-ink placeholder:text-slate-400 " +
+  "w-full rounded-lg border border-hairline bg-surface text-sm text-ink placeholder:text-slate-500 " +
   "transition-colors hover:border-slate-300 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 " +
   "disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-muted";
 
@@ -25,13 +25,13 @@ export function TextInput({ label, adornment, className, hint, id, ...rest }: Te
   return (
     <div className={cn("min-w-0", className)}>
       {label && (
-        <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium text-muted">
+        <label htmlFor={inputId} className="mb-1.5 block text-[13px] font-medium text-muted">
           {label}
         </label>
       )}
       <div className="relative">
         {adornment && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted">
             {adornment}
           </span>
         )}
@@ -43,7 +43,7 @@ export function TextInput({ label, adornment, className, hint, id, ...rest }: Te
         />
       </div>
       {hint && (
-        <p id={hintId} className="mt-1 text-xs text-muted">
+        <p id={hintId} className="mt-1 text-[13px] text-muted">
           {hint}
         </p>
       )}
@@ -64,7 +64,7 @@ export function Select({ label, className, options, id, ...rest }: SelectProps) 
   return (
     <div className={cn("min-w-0", className)}>
       {label && (
-        <label htmlFor={selectId} className="mb-1.5 block text-xs font-medium text-muted">
+        <label htmlFor={selectId} className="mb-1.5 block text-[13px] font-medium text-muted">
           {label}
         </label>
       )}

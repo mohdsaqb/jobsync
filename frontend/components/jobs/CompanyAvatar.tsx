@@ -28,7 +28,7 @@ export default function CompanyAvatar({ company, className }: { company: string;
     <span
       aria-hidden="true"
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold",
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[13px] font-semibold",
         TINTS[hash],
         className,
       )}

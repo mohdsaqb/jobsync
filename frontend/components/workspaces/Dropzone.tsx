@@ -43,7 +43,7 @@ export default function Dropzone({
           </span>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-ink">{file.name}</p>
-            <p className="mt-0.5 text-xs text-muted">
+            <p className="mt-0.5 text-[13px] text-muted">
               {isImage ? "Image" : "PDF"} · {(file.size / 1024).toFixed(0)} KB
             </p>
           </div>
@@ -91,7 +91,7 @@ export default function Dropzone({
           disabled={disabled}
           onChange={(e) => accept(e.target.files?.[0])}
         />
-        <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-surface text-slate-500">
+        <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-surface text-muted">
           <UploadCloud className="h-5 w-5" />
         </span>
         <p className="mt-3 text-sm font-semibold text-ink">Upload your resume</p>
@@ -105,7 +105,7 @@ export default function Dropzone({
         >
           Choose file
         </Button>
-        <p className="mt-3 text-xs text-slate-400">PDF, PNG or JPG · up to 5MB</p>
+        <p className="mt-3 text-[13px] text-muted">PDF, PNG or JPG · up to 5MB</p>
       </div>
       {sizeError && (
         <p role="alert" className="mt-2 text-[13px] text-danger">

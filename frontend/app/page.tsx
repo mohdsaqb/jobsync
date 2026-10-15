@@ -6,7 +6,7 @@ import JobsWorkspace from "@/components/workspaces/JobsWorkspace";
 import ResumeWorkspace, { type ResumeResult } from "@/components/workspaces/ResumeWorkspace";
 import SuggestionsWorkspace from "@/components/workspaces/SuggestionsWorkspace";
 import { analyzeResume, getResumeSuggestions, type AnalyzeOptions } from "@/lib/api";
-import type { AnalyzeMeta, JobMatch } from "@/lib/types";
+import type { JobMatch } from "@/lib/types";
 import type { Workspace } from "@/lib/workspace";
 
 const WORKSPACES: Workspace[] = ["resume", "jobs", "suggestions"];
@@ -23,7 +23,6 @@ export default function Home() {
   const [matches, setMatches] = useState<JobMatch[] | null>(null);
   const [resumeText, setResumeText] = useState("");
   const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
-  const [meta, setMeta] = useState<AnalyzeMeta | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
@@ -66,12 +65,10 @@ export default function Home() {
         const result = await analyzeResume(file, hints);
         setMatches(result.matches);
         setResumeText(result.resumeText);
-        setMeta(result.meta ?? null);
         setResumeResult({
           matchCount: result.matches.length,
           resumeSkills: result.resumeSkills,
           resumeChars: result.resumeText.length,
-          warming: result.meta?.warming ?? false,
         });
         // A new resume invalidates the previous selection and advice.
         setSelectedJobId(null);
@@ -90,7 +87,6 @@ export default function Home() {
     setMatches(null);
     setResumeText("");
     setResumeResult(null);
-    setMeta(null);
     setAnalyzeError(null);
     setSelectedJobId(null);
     setSuggestions(null);
@@ -127,10 +123,7 @@ export default function Home() {
       current={workspace}
       onNavigate={go}
       matchCount={matches?.length ?? null}
-      selectedJobTitle={selectedJob?.title ?? null}
       hasResults={hasResults}
-      resumeFailed={analyzeError !== null}
-      meta={meta}
       busy={analyzing}
     >
       {workspace === "resume" && (
@@ -147,7 +140,6 @@ export default function Home() {
       {workspace === "jobs" && (
         <JobsWorkspace
           matches={matches}
-          meta={meta}
           loading={analyzing}
           error={analyzeError}
           selectedJobId={selectedJobId}

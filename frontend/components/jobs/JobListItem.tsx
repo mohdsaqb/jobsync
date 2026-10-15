@@ -41,7 +41,7 @@ export default function JobListItem({
         <span className="min-w-0 flex-1">
           <span className="flex items-start justify-between gap-2">
             <span className="min-w-0">
-              <span className="block truncate text-[14.5px] font-semibold text-ink">{job.title}</span>
+              <span className="block truncate text-sm font-semibold text-ink">{job.title}</span>
               <span className="mt-0.5 block truncate text-[13px] text-muted">{job.company}</span>
             </span>
             {/* Padded so the bookmark button never overlaps the score. */}
@@ -51,7 +51,7 @@ export default function JobListItem({
           </span>
 
           {(job.location || salary || posted) && (
-            <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
               {job.location && (
                 <span className="flex min-w-0 items-center gap-1">
                   <MapPin className="h-3 w-3 shrink-0" />
@@ -82,7 +82,8 @@ export default function JobListItem({
         aria-pressed={saved}
         className={cn(
           "absolute right-3 top-3 rounded-md p-1.5 transition-colors",
-          saved ? "text-amber-500" : "text-slate-300 hover:bg-white hover:text-slate-500",
+          // slate-500 clears the 3:1 minimum for interactive controls; slate-300 did not.
+          saved ? "text-amber-600" : "text-slate-500 hover:bg-white hover:text-ink",
         )}
       >
         {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}

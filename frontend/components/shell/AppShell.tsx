@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { AnalyzeMeta } from "@/lib/types";
 import type { Workspace } from "@/lib/workspace";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
@@ -10,10 +9,7 @@ interface AppShellProps {
   current: Workspace;
   onNavigate: (workspace: Workspace) => void;
   matchCount: number | null;
-  selectedJobTitle: string | null;
   hasResults: boolean;
-  resumeFailed: boolean;
-  meta: AnalyzeMeta | null;
   busy: boolean;
   children: ReactNode;
 }
@@ -22,7 +18,7 @@ interface AppShellProps {
  * Owns the persistent chrome. The sidebar and header stay mounted while the
  * workspace content swaps, so switching steps never feels like a page load.
  */
-export default function AppShell({ current, onNavigate, children, meta, busy, ...nav }: AppShellProps) {
+export default function AppShell({ current, onNavigate, children, busy, ...nav }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
 
   // A drawer that survives navigation would cover the screen it just revealed.
@@ -65,7 +61,7 @@ export default function AppShell({ current, onNavigate, children, meta, busy, ..
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Header current={current} meta={meta} busy={busy} onOpenNav={() => setNavOpen(true)} />
+        <Header current={current} busy={busy} onOpenNav={() => setNavOpen(true)} />
         {/* Keyed on the workspace so the content re-animates on each switch. */}
         <main key={current} className="workspace-enter min-h-0 flex-1 overflow-y-auto scrollbar-slim">
           {children}

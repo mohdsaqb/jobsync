@@ -14,7 +14,7 @@ const config: Config = {
         canvas: "#F8FAFC",
         surface: "#FFFFFF",
         ink: "#111827",
-        muted: "#64748B",
+        muted: "#475569",
         hairline: "#E5E7EB",
         brand: {
           DEFAULT: "#4F46E5",
