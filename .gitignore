@@ -5,6 +5,8 @@ build/
 *.tsbuildinfo
 .env
 volumes/
+# runtime state (Adzuna call history, sync bookkeeping)
+backend/data/
 backend/uploads/*
 !backend/uploads/.gitkeep
 # tesseract.js downloads OCR training data into the backend cwd at runtime

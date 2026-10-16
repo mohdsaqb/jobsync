@@ -1,13 +1,24 @@
-import type { JobMatch } from "./types";
+import type { AnalyzeMeta, JobMatch } from "./types";
 
 interface AnalyzeResumeResult {
   matches: JobMatch[];
   resumeText: string;
+  /** Tracked skills detected in the resume; empty when none were recognised. */
+  resumeSkills: string[];
+  meta?: AnalyzeMeta;
 }
 
-export async function analyzeResume(file: File): Promise<AnalyzeResumeResult> {
+export interface AnalyzeOptions {
+  /** Optional hints that let the backend pull in fresh postings for this role. */
+  targetRole?: string;
+  location?: string;
+}
+
+export async function analyzeResume(file: File, options: AnalyzeOptions = {}): Promise<AnalyzeResumeResult> {
   const formData = new FormData();
   formData.append("resume", file);
+  if (options.targetRole?.trim()) formData.append("targetRole", options.targetRole.trim());
+  if (options.location?.trim()) formData.append("location", options.location.trim());
 
   const response = await fetch("/api/resume/analyze", {
     method: "POST",
@@ -20,7 +31,12 @@ export async function analyzeResume(file: File): Promise<AnalyzeResumeResult> {
     throw new Error(body.error ?? "Failed to analyze resume.");
   }
 
-  return { matches: body.matches as JobMatch[], resumeText: body.resumeText as string };
+  return {
+    matches: body.matches as JobMatch[],
+    resumeText: body.resumeText as string,
+    resumeSkills: (body.resumeSkills as string[] | undefined) ?? [],
+    meta: body.meta as AnalyzeMeta | undefined,
+  };
 }
 
 export async function getResumeSuggestions(resumeText: string, targetRole: string): Promise<string> {
