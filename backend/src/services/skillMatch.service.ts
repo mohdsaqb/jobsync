@@ -26,22 +26,67 @@ const SKILL_KEYWORDS = [
   "jest", "cypress", "selenium", "playwright", "test automation", "unit testing", "qa",
   // General / process
   "git", "agile", "scrum", "kanban", "jira", "ci pipelines", "api design", "system design",
+  // Common resume skills outside the original web-development list.
+  "c", "c++", "linux", "object oriented programming", "data structures", "algorithms",
+  "figma", "power bi", "tableau", "excel", "statistics", "matlab", "r programming",
+  "autocad", "solidworks", "cad", "finite element analysis", "six sigma", "quality control",
+  "project management", "communication", "team leadership", "problem solving",
+  "customer service", "recruitment", "budgeting", "financial modeling", "financial reporting",
+  "salesforce", "seo", "google analytics", "patient care", "lesson planning",
 ];
+
+const SKILL_ALIASES: Record<string, string[]> = {
+  react: ["reactjs", "react.js"],
+  "react native": ["react-native"],
+  angular: ["angularjs", "angular.js"],
+  vue: ["vuejs", "vue.js"],
+  "next.js": ["nextjs", "next js"],
+  "node.js": ["nodejs", "node js"],
+  express: ["expressjs", "express.js"],
+  nestjs: ["nest.js", "nest js"],
+  javascript: ["java script"],
+  typescript: ["type script"],
+  "tailwind css": ["tailwindcss", "tailwind"],
+  "spring boot": ["springboot"],
+  "c#": ["csharp", "c sharp"],
+  ".net": ["dotnet", "dot net"],
+  "c++": ["cpp", "c plus plus"],
+  mongodb: ["mongo db", "mongo"],
+  postgresql: ["postgres", "postgre sql"],
+  mysql: ["my sql"],
+  "scikit-learn": ["scikit learn", "sklearn"],
+  aws: ["amazon web services"],
+  gcp: ["google cloud platform", "google cloud"],
+  kubernetes: ["k8s"],
+  "ci/cd": ["ci / cd", "ci-cd"],
+  "object oriented programming": ["object-oriented programming", "oop", "oops"],
+  "data structures": ["data structure", "dsa"],
+  algorithms: ["dsa"],
+  "power bi": ["powerbi", "microsoft power bi"],
+  excel: ["microsoft excel", "ms excel"],
+  "r programming": ["r language"],
+  "problem solving": ["problem-solving"],
+};
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-const SKILL_PATTERNS: [skill: string, pattern: RegExp][] = SKILL_KEYWORDS.map((skill) => [
-  skill,
-  new RegExp(`(?<![a-z0-9])${escapeRegExp(skill.toLowerCase())}(?![a-z0-9])`, "i"),
-]);
+const SKILL_PATTERNS: [skill: string, pattern: RegExp][] = SKILL_KEYWORDS.map((skill) => {
+  const alternatives = [skill, ...(SKILL_ALIASES[skill] ?? [])]
+    .map((name) => escapeRegExp(name).replace(/ /g, "\\s+"))
+    .join("|");
+  // Include + and # in the trailing boundary so C++/C# don't also count as C.
+  return [skill, new RegExp(`(?<![a-z0-9])(?:${alternatives})(?![a-z0-9+#])`, "i")];
+});
 
 export function extractSkills(text: string): Set<string> {
-  const lower = text.toLowerCase();
+  const normalized = text.normalize("NFKC")
+    .replace(/[\u200B-\u200D\uFEFF\u00AD]/g, "")
+    .replace(/[\u2010-\u2015\u2212]/g, "-");
   const found = new Set<string>();
   for (const [skill, pattern] of SKILL_PATTERNS) {
-    if (pattern.test(lower)) found.add(skill);
+    if (pattern.test(normalized)) found.add(skill);
   }
   return found;
 }

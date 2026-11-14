@@ -12,7 +12,7 @@ import type { AnalyzeOptions } from "@/lib/api";
 
 export interface ResumeResult {
   matchCount: number;
-  resumeSkills: string[];
+  resumeSkills: string[] | null;
   resumeChars: number;
 }
 
@@ -50,13 +50,21 @@ export default function ResumeWorkspace({
             <div className="flex items-center gap-2.5">
               <CheckCircle2 className="h-5 w-5 shrink-0 text-success" />
               <p className="text-sm font-medium text-ink">
-                {result.resumeSkills.length > 0
+                {result.resumeSkills === null
+                  ? "Skill detection unavailable"
+                  : result.resumeSkills.length > 0
                   ? `${result.resumeSkills.length} skills detected`
                   : "No tracked skills detected"}
               </p>
             </div>
 
-            {result.resumeSkills.length > 0 && (
+            {result.resumeSkills === null && (
+              <p className="mt-3 text-sm text-muted">
+                Restart the backend with the latest version, then upload your resume again to see detected skills.
+              </p>
+            )}
+
+            {result.resumeSkills !== null && result.resumeSkills.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-1.5">
                 {result.resumeSkills.map((skill) => (
                   <Badge key={skill}>{skill}</Badge>

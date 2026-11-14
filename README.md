@@ -114,7 +114,7 @@ sequenceDiagram
 
 - **`embedding.service.ts`** — loads `bge-small-en-v1.5` once via `@xenova/transformers` and reuses it. Output is mean-pooled and L2-normalized, so cosine similarity reduces to a plain dot product wherever it's needed outside Milvus. Queries get a BGE-specific instruction prefix that passages don't, since the model is trained asymmetrically for retrieval.
 - **`milvus.service.ts`** — owns the collection schema (`job_id`, `title`, `company`, `description`, `embedding`) and an HNSW index with a COSINE metric. Clamps the search `limit` to 1024 to work around a Zilliz Cloud serverless quirk (see below).
-- **`skillMatch.service.ts`** — matches resume/job text against a curated keyword list with word-boundary-aware regex, and scores overlap as *(skills the resume has) / (skills the job asks for)*.
+- **`skillMatch.service.ts`** — matches resume/job text against a curated keyword list, normalizes aliases such as ReactJS/React and NodeJS/Node.js, and handles Unicode and wrapped skill names from PDFs/OCR. Scores overlap as *(skills the resume has) / (skills the job asks for)*.
 - **`textExtraction.service.ts`** — reads a PDF's embedded text layer directly (`pdfjs-dist`); for images, runs Tesseract OCR.
 - **`aiSuggestions.service.ts`** — a thin wrapper over the configured LLM provider with a fixed resume-coach system prompt, capped at 6 concrete suggestions per response. The resume is truncated to 8,000 characters before sending, since Groq's free tier allows ~6,000 tokens per minute and a full-length resume would consume a whole minute's budget alone.
 - **`services/llm/`** — a one-method `LlmProvider` interface with Groq and Gemini implementations, selected by `LLM_PROVIDER`. Each provider normalises its own SDK errors into a shared `LlmApiError`, so the controller maps status codes without knowing which SDK threw.
@@ -198,10 +198,13 @@ Response `200`:
 ```json
 {
   "matches": [{ "jobId": "...", "title": "...", "company": "...", "description": "...", "score": 0.0 }],
-  "resumeText": "..."
+  "resumeText": "...",
+  "resumeSkills": ["node.js", "react"]
 }
 ```
 Errors: `400` no file / unsupported type or too large · `422` couldn't extract enough text (e.g. a scanned PDF with no text layer) · `500` unexpected failure.
+
+`resumeSkills` contains the sorted, deduplicated canonical skills detected in the extracted resume text; an empty array means no tracked skills matched. A missing field from an older backend means skill detection results are unavailable. Rebuild/restart that backend and upload again. `npm start` rebuilds the backend automatically to keep its compiled response in sync with the source.
 
 **`POST /api/resume/suggest`**
 JSON body: `{ "resumeText": string, "targetRole": string }` (resume ≤20,000 chars, role ≤200 chars).
@@ -296,7 +299,9 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 
 ## Testing
 
-There's no automated test suite yet (see Future Improvements) — verify changes manually:
+Run the resume skill regression tests with `cd backend && npm test`. They cover aliases, PDF text extraction, word boundaries, overlap scoring, and the upload client's handling of missing skill results. They do not require an API key, embedding download, or Milvus.
+
+Additional checks:
 
 1. `cd backend && npx tsc --noEmit && npm run build` — typecheck and confirm the backend compiles.
 2. `cd frontend && npx tsc --noEmit && npm run build` — same for the frontend.
@@ -306,7 +311,7 @@ There's no automated test suite yet (see Future Improvements) — verify changes
 
 ## Future Improvements
 
-- **Automated tests** — unit tests for the scoring/ranking logic, integration tests for the API endpoints.
+- **Broader automated tests** — ranking and live API integration tests beyond the resume skill regression suite.
 - **A shared types package** — `JobMatch` is currently hand-duplicated between `backend/src/types` and `frontend/lib/types.ts`, with no compile-time guarantee they stay in sync.
 - **Auth and rate-limiting** on the API endpoints — currently open to any caller.
 - **OCR fallback for scanned PDFs** — image-only PDFs currently need to be re-uploaded as a PNG/JPG rather than being rasterized automatically.
