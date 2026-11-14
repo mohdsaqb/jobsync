@@ -204,7 +204,7 @@ Response `200`:
 ```
 Errors: `400` no file / unsupported type or too large · `422` couldn't extract enough text (e.g. a scanned PDF with no text layer) · `500` unexpected failure.
 
-`resumeSkills` contains the sorted, deduplicated canonical skills detected in the extracted resume text; an empty array means no tracked skills matched. A missing field from an older backend means skill detection results are unavailable. Rebuild/restart that backend and upload again. `npm start` rebuilds the backend automatically to keep its compiled response in sync with the source.
+`resumeSkills` contains the sorted, deduplicated canonical skills detected in the extracted resume text; an empty array means no tracked skills matched. A missing field from an older backend means skill detection results are unavailable. Run `npm run build` before restarting that backend and upload again.
 
 **`POST /api/resume/suggest`**
 JSON body: `{ "resumeText": string, "targetRole": string }` (resume ≤20,000 chars, role ≤200 chars).
@@ -275,6 +275,8 @@ npm run dev
 ```
 
 The API listens on `http://localhost:4000`.
+
+For production, set the service root directory to `backend`, use `npm ci --include=dev && npm run build && npm prune --omit=dev` as the build command, and `npm start` as the start command. TypeScript and type definitions are needed during the build. Startup runs the compiled server without requiring development dependencies. Rebuild after source changes so `dist/` stays current.
 
 ### 4. Run the frontend
 
