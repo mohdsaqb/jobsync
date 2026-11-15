@@ -11,6 +11,7 @@
     "seed": "tsx src/scripts/seedJobs.ts",
     "seed:reset": "tsx src/scripts/seedJobs.ts --reset",
     "generate:jobs": "tsx src/scripts/generateJobs.ts",
+    "dedupe:jobs": "tsx src/scripts/deduplicateJobs.ts",
     "fetch:adzuna": "tsx src/scripts/fetchAdzunaJobs.ts"
   },
   "dependencies": {

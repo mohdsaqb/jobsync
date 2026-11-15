@@ -28,14 +28,16 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 - **Vector similarity search** — Milvus with an HNSW index, cosine similarity
 - **Skill-overlap rescoring** — corrects semantic drift by directly checking required-skill coverage
 - **AI resume coaching** — role-targeted, actionable suggestions via Groq (optional, provider-swappable)
-- **Paginated, ranked results** with a bookmark toggle and a full-detail modal per job
+- **Ranked results** with bookmarks, a detail pane, and application links
+- **Apply to real postings** from the job list or details; sample jobs offer a role search on LinkedIn
+- **Duplicate removal** across imports, generated samples, seeding, and ranked results
 - **Resizable, collapsible sidebar** and a dark, glassmorphic UI
 
 ## Key Metrics / Results
 
 Concrete numbers from the shipped project — this is a demo/portfolio build with no formal benchmark suite, so these are architectural facts, not accuracy claims:
 
-- **10,005** seeded job listings across **450+** companies (`backend/src/data/jobs.json`)
+- **9,725** unique sample job listings across **450+** companies (`backend/src/data/jobs.json`), after removing 280 repeated roles
 - **384-dimension** embeddings (`bge-small-en-v1.5`, mean-pooled, L2-normalized)
 - Up to **1,024** candidate matches retrieved per search (Zilliz Cloud's serverless search-limit ceiling)
 - **5MB** upload limit, **3** supported input formats (PDF, PNG, JPEG)
@@ -249,7 +251,7 @@ npm install
 npm run seed   # embeds and inserts the job descriptions into Milvus (one-time)
 ```
 
-The repo ships with `backend/src/data/jobs.json` already populated with 10,005 job descriptions across software/tech, core engineering, and non-tech roles — so `npm run seed` has a large, varied pool to match resumes against out of the box.
+The repo ships with `backend/src/data/jobs.json` already populated with 9,725 unique sample job descriptions across software/tech, core engineering, and non-tech roles — so `npm run seed` has a large, varied pool to match resumes against out of the box.
 
 **To enable AI resume suggestions**, add a Groq API key to `backend/.env`:
 
@@ -265,8 +267,13 @@ To regenerate the job pool or start over:
 
 ```bash
 npm run generate:jobs   # regenerates data/jobs.json with a fresh synthetic set
+npm run dedupe:jobs     # removes duplicate records from data/jobs.json, preserving retained IDs
 npm run seed:reset      # drops the existing Milvus collection and re-seeds it
 ```
+
+To import real postings with application links, set `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, and optionally `ADZUNA_COUNTRY` in `backend/.env`, then run `npm run fetch:adzuna` followed by `npm run seed:reset`. The importer retains the original posting URL, location, salary, and publication date. Restart the backend after updating the catalog: search results get source metadata from `jobs.json` by job ID, so existing Milvus collections need no schema migration.
+
+Duplicate sample roles share a normalized title, company, and location. Real postings are deduplicated by ID, original URL (ignoring UTM tags and fragments), or matching title/company/location/description; different descriptions and locations remain separate. Search results are deduplicated after scoring, retaining the highest ranked copy, so an existing index also stops displaying repeated jobs without a reset.
 
 ### 3. Run the backend
 
@@ -295,13 +302,13 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 - The **sidebar** is a real resizable panel — drag its right edge, or drag past a threshold and release to snap into an icon-only rail.
 - Upload a resume and the view transitions into a **results screen**, 20 matches per page, with Prev/Next and a jump-to-page control.
 - Jobs scoring **10% or below** are filtered out server-side, so you won't see irrelevant postings.
-- Click any **job card** to open its full posting in a modal, with the same Save/Apply actions.
-- Each job has a working **bookmark toggle** (persisted in `localStorage`). **Apply** is a demo affordance — postings are synthetic, so it shows a note instead of linking anywhere real.
+- Select a **job card** to read its full description in the detail pane.
+- Each job has a **bookmark toggle** persisted in `localStorage`. **Apply** opens the original posting in a new tab so you can submit an application on the source site. When no original URL exists, **Find openings** searches LinkedIn; sample listings search by role alone because their companies are fictional. These actions are available in both the job list and detail pane.
 - The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
 
 ## Testing
 
-Run the resume skill regression tests with `cd backend && npm test`. They cover aliases, PDF text extraction, word boundaries, overlap scoring, and the upload client's handling of missing skill results. They do not require an API key, embedding download, or Milvus.
+Run the regression tests with `cd backend && npm test`. They cover skills, PDF text extraction, upload responses, application links and safe search fallbacks, catalog metadata, and duplicate detection. They do not require an API key, embedding download, or Milvus.
 
 Additional checks:
 

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button, LinkButton } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 import { formatPostedAge, formatSalary } from "@/lib/jobMeta";
+import { jobApplication } from "@/lib/jobApplication";
 import { matchPercent, scoreTier } from "@/lib/scoreTier";
 import type { JobMatch } from "@/lib/types";
 import { useJobActions } from "@/lib/useJobActions";
@@ -16,6 +17,7 @@ export default function JobDetail({ job, onGetSuggestions }: { job: JobMatch; on
   const posted = formatPostedAge(job.createdAt);
   const matched = job.matchedSkills ?? [];
   const unmatched = job.unmatchedSkills ?? [];
+  const application = jobApplication(job);
 
   return (
     <div className="flex h-full flex-col">
@@ -48,16 +50,15 @@ export default function JobDetail({ job, onGetSuggestions }: { job: JobMatch; on
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {job.url && (
-            <LinkButton
-              href={job.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              icon={<ExternalLink className="h-4 w-4" />}
-            >
-              Apply
-            </LinkButton>
-          )}
+          <LinkButton
+            href={application.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${application.label} for ${job.title} (opens in a new tab)`}
+            icon={<ExternalLink className="h-4 w-4" />}
+          >
+            {application.label}
+          </LinkButton>
           <Button variant="secondary" onClick={onGetSuggestions} icon={<Sparkles className="h-4 w-4" />}>
             Get suggestions
           </Button>
@@ -65,6 +66,7 @@ export default function JobDetail({ job, onGetSuggestions }: { job: JobMatch; on
             {saved ? "Saved" : "Save"}
           </Button>
         </div>
+        <p className="mt-2 text-xs text-muted">{application.note} Opens in a new tab.</p>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-slim px-5 py-5">

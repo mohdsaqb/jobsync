@@ -1,7 +1,9 @@
 "use client";
 
-import { Banknote, Bookmark, BookmarkCheck, Clock, MapPin } from "lucide-react";
+import { Banknote, Bookmark, BookmarkCheck, Clock, ExternalLink, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
+import { LinkButton } from "@/components/ui/Button";
+import { jobApplication } from "@/lib/jobApplication";
 import { cn } from "@/lib/cn";
 import { formatPostedAge, formatSalary } from "@/lib/jobMeta";
 import { matchPercent, scoreTier } from "@/lib/scoreTier";
@@ -22,6 +24,7 @@ export default function JobListItem({
   const tier = scoreTier(job.score);
   const salary = formatSalary(job.salaryMin, job.salaryMax);
   const posted = formatPostedAge(job.createdAt);
+  const application = jobApplication(job);
 
   return (
     <div
@@ -74,6 +77,21 @@ export default function JobListItem({
           )}
         </span>
       </button>
+
+      <div className="px-4 pb-4 pl-16">
+        <LinkButton
+          href={application.href}
+          size="sm"
+          variant="secondary"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${application.label} for ${job.title} (opens in a new tab)`}
+          title={application.note}
+          icon={<ExternalLink className="h-3.5 w-3.5" />}
+        >
+          {application.label}
+        </LinkButton>
+      </div>
 
       <button
         type="button"

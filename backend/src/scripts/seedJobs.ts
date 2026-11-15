@@ -2,6 +2,7 @@ import jobs from "../data/jobs.json" with { type: "json" };
 import { embedText } from "../services/embedding.service.js";
 import { countJobs, dropCollection, ensureCollection, insertJobs } from "../services/milvus.service.js";
 import type { JobDescription } from "../types/index.js";
+import { deduplicateJobs } from "../services/jobIdentity.js";
 
 const RESET = process.argv.includes("--reset");
 const BATCH_SIZE = 50;
@@ -21,7 +22,7 @@ async function main() {
     return;
   }
 
-  const allJobs = jobs as JobDescription[];
+  const allJobs = deduplicateJobs(jobs as JobDescription[]);
   console.log(`Embedding and inserting ${allJobs.length} job descriptions in batches of ${BATCH_SIZE}...`);
 
   for (let i = 0; i < allJobs.length; i += BATCH_SIZE) {

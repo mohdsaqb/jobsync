@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { JobDescription } from "../types/index.js";
+import { deduplicateJobs } from "../services/jobIdentity.js";
 
 /**
  * Generates a large, varied set of sample job descriptions by combining
@@ -1080,7 +1081,7 @@ function generateJobs(): JobDescription[] {
 }
 
 async function main() {
-  const jobs = generateJobs();
+  const jobs = deduplicateJobs(generateJobs());
   const outputPath = path.join(import.meta.dirname, "..", "data", "jobs.json");
   await fs.writeFile(outputPath, JSON.stringify(jobs, null, 2));
   console.log(`Generated ${jobs.length} job descriptions across ${ROLES.length} roles -> ${outputPath}`);

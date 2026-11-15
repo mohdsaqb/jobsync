@@ -3,6 +3,8 @@ import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { embedQuery } from "../services/embedding.service.js";
 import { searchJobs } from "../services/milvus.service.js";
+import { withCatalogMetadata } from "../services/jobCatalog.js";
+import { deduplicateJobs } from "../services/jobIdentity.js";
 import { extractSkills, skillOverlapScore } from "../services/skillMatch.service.js";
 import { extractResumeText, TextExtractionError } from "../services/textExtraction.service.js";
 
@@ -27,6 +29,7 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
 
     const resumeSkills = extractSkills(text);
     const rescored = matches
+      .map((match) => withCatalogMetadata(match))
       .map((match) => {
         const jobSkills = extractSkills(`${match.title} ${match.description}`);
         const overlap = skillOverlapScore(resumeSkills, jobSkills);
@@ -46,7 +49,7 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
       })
       .sort((a, b) => b.score - a.score);
 
-    const relevantMatches = rescored.filter((match) => match.score > MIN_MATCH_SCORE);
+    const relevantMatches = deduplicateJobs(rescored.filter((match) => match.score > MIN_MATCH_SCORE));
 
     res.json({ matches: relevantMatches, resumeText: text, resumeSkills: [...resumeSkills].sort() });
   } catch (err) {

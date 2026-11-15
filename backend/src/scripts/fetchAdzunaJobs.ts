@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import type { JobDescription } from "../types/index.js";
+import { deduplicateJobs, postingUrl } from "../services/jobIdentity.js";
 
 /**
  * Pulls real job postings from the Adzuna API (https://developer.adzuna.com/)
@@ -42,6 +43,11 @@ interface AdzunaResult {
   title?: string;
   company?: { display_name?: string };
   description?: string;
+  redirect_url?: string;
+  location?: { display_name?: string };
+  salary_min?: number;
+  salary_max?: number;
+  created?: string;
 }
 
 function stripHtml(text: string): string {
@@ -80,7 +86,7 @@ async function main() {
 
   const dataPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../data/jobs.json");
   const existing: JobDescription[] = JSON.parse(await fs.readFile(dataPath, "utf-8"));
-  const seenIds = new Set(existing.map((j) => j.jobId));
+  const seenIds = new Set<string>();
 
   const collected: JobDescription[] = [];
 
@@ -105,6 +111,13 @@ async function main() {
           title: clean(r.title, 256),
           company: clean(r.company.display_name, 256),
           description: clean(r.description, 8192),
+          url: postingUrl(r.redirect_url),
+          location: r.location?.display_name ? clean(r.location.display_name, 256) : undefined,
+          salaryMin: r.salary_min,
+          salaryMax: r.salary_max,
+          createdAt: r.created && Number.isFinite(Date.parse(r.created))
+            ? Math.floor(Date.parse(r.created) / 1000)
+            : undefined,
         });
       }
 
@@ -112,12 +125,13 @@ async function main() {
     }
   }
 
-  console.log(`\nFetched ${collected.length} new real job postings from Adzuna.`);
+  console.log(`\nFetched ${collected.length} real job postings from Adzuna.`);
 
-  const merged = [...existing, ...collected];
+  // Fresh records come first so repeat imports also refresh application links.
+  const merged = deduplicateJobs([...collected, ...existing]);
   await fs.writeFile(dataPath, `${JSON.stringify(merged, null, 2)}\n`);
   console.log(
-    `Wrote ${merged.length} total jobs to data/jobs.json (${existing.length} existing + ${collected.length} new).`,
+    `Wrote ${merged.length} unique jobs to data/jobs.json.`,
   );
   console.log("Next: run `npm run seed:reset` to push the updated dataset into Milvus.");
 }
