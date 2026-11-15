@@ -11,16 +11,14 @@ const CONTROL =
 
 interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "className"> {
   label?: string;
-  /** Rendered inside the field on the left, e.g. a search glyph. */
+
   adornment?: ReactNode;
   className?: string;
-  hint?: string;
 }
 
-export function TextInput({ label, adornment, className, hint, id, ...rest }: TextInputProps) {
+export function TextInput({ label, adornment, className, id, ...rest }: TextInputProps) {
   const generated = useId();
   const inputId = id ?? generated;
-  const hintId = hint ? `${inputId}-hint` : undefined;
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -38,15 +36,9 @@ export function TextInput({ label, adornment, className, hint, id, ...rest }: Te
         <input
           {...rest}
           id={inputId}
-          aria-describedby={hintId}
           className={cn(CONTROL, "h-10", adornment ? "pl-9 pr-3" : "px-3")}
         />
       </div>
-      {hint && (
-        <p id={hintId} className="mt-1 text-[13px] text-muted">
-          {hint}
-        </p>
-      )}
     </div>
   );
 }

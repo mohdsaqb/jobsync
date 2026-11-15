@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
-import { generateResumeSuggestions, LLM_KEY_ENV_VAR, MissingApiKeyError } from "../services/aiSuggestions.service.js";
-import { LlmApiError } from "../services/llm/index.js";
+import { generateResumeSuggestions, LLM_KEY_ENV_VAR, LlmApiError, MissingApiKeyError } from "../services/aiSuggestions.service.js";
 
 const MAX_RESUME_LENGTH = 20000;
 const MAX_ROLE_LENGTH = 200;
@@ -47,7 +46,7 @@ export async function suggestResumeImprovements(req: Request, res: Response): Pr
         res.status(502).json({ error: "The AI provider's rate limit was reached. Please wait a moment and try again." });
         return;
       }
-      // Not necessarily transient — surface the provider's own message rather than a generic one.
+
       res.status(502).json({ error: `AI suggestions are unavailable: ${err.message}` });
       return;
     }

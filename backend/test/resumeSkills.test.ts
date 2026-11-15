@@ -50,8 +50,6 @@ test("retains existing canonical skills and deduplicates aliases", () => {
   assert.equal(skillOverlapScore(new Set(), new Set()), 0);
 });
 
-// A minimal text-layer PDF keeps this regression independent of external files,
-// OCR downloads, embedding models, and the vector database.
 function resumePdf(): Buffer {
   const stream = "BT /F1 12 Tf 50 750 Td (Skills: ReactJS, NodeJS, NextJS, TailwindCSS, Python) Tj ET\n";
   const objects = [
@@ -94,6 +92,7 @@ test("upload client preserves detected skills and distinguishes missing results 
       globalThis.fetch = async (url, options) => {
         assert.equal(url, "/api/resume/analyze");
         assert.equal(options?.method, "POST");
+        assert.deepEqual([...(options?.body as FormData).keys()], ["resume"]);
         const uploaded = (options?.body as FormData).get("resume") as File;
         assert.equal(uploaded.name, "resume.pdf");
         return Response.json({ matches: [], resumeText: "Skills: ReactJS, NodeJS", resumeSkills: returnedSkills });

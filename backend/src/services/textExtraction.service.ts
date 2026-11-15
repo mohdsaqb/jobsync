@@ -32,7 +32,6 @@ async function extractFromImage(filePath: string): Promise<string> {
   }
 }
 
-/** PDFs are read via their text layer; images go through OCR. Scanned PDFs aren't rasterized. */
 export async function extractResumeText(filePath: string, mimetype: string): Promise<string> {
   let text: string;
 

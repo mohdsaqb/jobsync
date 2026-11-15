@@ -1,14 +1,6 @@
-/**
- * The LLM returns one markdown-ish blob, not structured fields. This splits it
- * into addressable items so each can be copied and marked reviewed, without
- * inventing structure the model didn't produce.
- *
- * Providers differ on heading style — Groq tends to emit "**1. Heading**" where
- * Gemini emitted plain "1. Heading" — so both are accepted, as are bullets.
- */
 export interface SuggestionItem {
   id: string;
-  /** Present only when the model actually gave the item a heading. */
+
   heading?: string;
   body: string;
 }
@@ -32,7 +24,6 @@ export function parseSuggestions(raw: string): SuggestionItem[] {
       .filter(Boolean);
     if (lines.length === 0) continue;
 
-    // A block of sibling bullets becomes one item per bullet.
     if (lines.length > 1 && lines.every((line) => BULLET.test(line))) {
       for (const line of lines) {
         const body = line.replace(BULLET, "$1").trim();
@@ -70,12 +61,10 @@ function stripEmphasis(text: string): string {
   return text.replace(/\*\*/g, "").trim();
 }
 
-/** Plain text for the clipboard — no markdown markers. */
 export function itemToPlainText(item: SuggestionItem): string {
   return [item.heading, item.body].filter(Boolean).join("\n").replace(/\*\*/g, "").trim();
 }
 
-/** Splits `**bold**` runs so they can be rendered as <strong>. */
 export function emphasisParts(text: string): { text: string; bold: boolean }[] {
   return text
     .split(/(\*\*[^*]+\*\*)/g)

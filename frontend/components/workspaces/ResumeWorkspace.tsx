@@ -6,15 +6,8 @@ import { Alert } from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { TextInput } from "@/components/ui/Field";
 import Dropzone from "./Dropzone";
-import type { AnalyzeOptions } from "@/lib/api";
-
-export interface ResumeResult {
-  matchCount: number;
-  resumeSkills: string[] | null;
-  resumeChars: number;
-}
+import type { AnalyzeResult } from "@/lib/types";
 
 export default function ResumeWorkspace({
   loading,
@@ -26,15 +19,13 @@ export default function ResumeWorkspace({
 }: {
   loading: boolean;
   error: string | null;
-  /** Present once an analysis has succeeded. */
-  result: ResumeResult | null;
-  onSubmit: (file: File, hints: AnalyzeOptions) => void;
+
+  result: AnalyzeResult | null;
+  onSubmit: (file: File) => void;
   onContinue: () => void;
   onReset: () => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
-  const [targetRole, setTargetRole] = useState("");
-  const [location, setLocation] = useState("");
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
@@ -42,8 +33,8 @@ export default function ResumeWorkspace({
         <>
           <h2 className="text-[26px] font-semibold tracking-tight text-ink">Your resume is ready</h2>
           <p className="mt-2 text-sm text-muted">
-            We found {result.matchCount.toLocaleString()} matching{" "}
-            {result.matchCount === 1 ? "role" : "roles"}.
+            We found {result.matches.length.toLocaleString()} matching{" "}
+            {result.matches.length === 1 ? "role" : "roles"}.
           </p>
 
           <Card className="mt-6 p-5">
@@ -92,25 +83,6 @@ export default function ResumeWorkspace({
           <Card className="mt-6 p-5">
             <Dropzone file={file} onSelect={setFile} disabled={loading} />
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <TextInput
-                label="Target role (optional)"
-                placeholder="Senior Frontend Developer"
-                value={targetRole}
-                maxLength={200}
-                disabled={loading}
-                onChange={(e) => setTargetRole(e.target.value)}
-              />
-              <TextInput
-                label="Location (optional)"
-                placeholder="Bengaluru"
-                value={location}
-                maxLength={120}
-                disabled={loading}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
-
             {error && (
               <Alert tone="error" className="mt-4">
                 {error}
@@ -119,7 +91,7 @@ export default function ResumeWorkspace({
 
             <div className="mt-5 border-t border-hairline pt-5">
               <Button
-                onClick={() => file && onSubmit(file, { targetRole, location })}
+                onClick={() => file && onSubmit(file)}
                 disabled={!file}
                 loading={loading}
               >

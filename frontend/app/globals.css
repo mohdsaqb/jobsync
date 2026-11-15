@@ -7,7 +7,6 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* One focus treatment for every interactive element, visible on keyboard only. */
   :focus-visible {
     outline: 2px solid #4f46e5;
     outline-offset: 2px;
@@ -21,8 +20,7 @@
 }
 
 @layer utilities {
-  /* Short fade used when a workspace mounts. Suppressed by the
-     prefers-reduced-motion block below, so it needs no JS guard. */
+
   .workspace-enter {
     animation: workspace-enter 180ms ease-out both;
   }
@@ -38,7 +36,6 @@
     }
   }
 
-  /* Thin neutral scrollbars for the independently scrolling job panes. */
   .scrollbar-slim {
     scrollbar-width: thin;
     scrollbar-color: #cbd5e1 transparent;
@@ -63,7 +60,6 @@
   }
 }
 
-/* Honour the OS setting rather than animating regardless. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

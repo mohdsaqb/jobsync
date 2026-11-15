@@ -1,9 +1,5 @@
 import { cn } from "@/lib/cn";
 
-/**
- * Initials on a tinted square. The job source provides no logo URL, so this is
- * an honest fallback rather than a stand-in for a real company mark.
- */
 const TINTS = [
   "bg-indigo-50 text-indigo-700",
   "bg-sky-50 text-sky-700",

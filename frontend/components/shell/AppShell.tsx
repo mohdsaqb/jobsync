@@ -14,14 +14,9 @@ interface AppShellProps {
   children: ReactNode;
 }
 
-/**
- * Owns the persistent chrome. The sidebar and header stay mounted while the
- * workspace content swaps, so switching steps never feels like a page load.
- */
 export default function AppShell({ current, onNavigate, children, busy, ...nav }: AppShellProps) {
   const [navOpen, setNavOpen] = useState(false);
 
-  // A drawer that survives navigation would cover the screen it just revealed.
   useEffect(() => {
     setNavOpen(false);
   }, [current]);
@@ -62,7 +57,7 @@ export default function AppShell({ current, onNavigate, children, busy, ...nav }
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Header current={current} busy={busy} onOpenNav={() => setNavOpen(true)} />
-        {/* Keyed on the workspace so the content re-animates on each switch. */}
+
         <main key={current} className="workspace-enter min-h-0 flex-1 overflow-y-auto scrollbar-slim">
           {children}
         </main>

@@ -9,7 +9,7 @@ export default function Header({
   onOpenNav,
 }: {
   current: Workspace;
-  /** True while an analysis is in flight. */
+
   busy: boolean;
   onOpenNav: () => void;
 }) {

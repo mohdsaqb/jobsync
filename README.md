@@ -31,7 +31,7 @@ Resume text is extracted, embedded into a vector, and compared against a pre-emb
 - **Ranked results** with bookmarks, a detail pane, and application links
 - **Apply to real postings** from the job list or details; sample jobs offer a role search on LinkedIn
 - **Duplicate removal** across imports, generated samples, seeding, and ranked results
-- **Resizable, collapsible sidebar** and a dark, glassmorphic UI
+- **Desktop sidebar and mobile navigation** with separate resume, jobs, and suggestions workspaces
 
 ## Key Metrics / Results
 
@@ -118,8 +118,7 @@ sequenceDiagram
 - **`milvus.service.ts`** — owns the collection schema (`job_id`, `title`, `company`, `description`, `embedding`) and an HNSW index with a COSINE metric. Clamps the search `limit` to 1024 to work around a Zilliz Cloud serverless quirk (see below).
 - **`skillMatch.service.ts`** — matches resume/job text against a curated keyword list, normalizes aliases such as ReactJS/React and NodeJS/Node.js, and handles Unicode and wrapped skill names from PDFs/OCR. Scores overlap as *(skills the resume has) / (skills the job asks for)*.
 - **`textExtraction.service.ts`** — reads a PDF's embedded text layer directly (`pdfjs-dist`); for images, runs Tesseract OCR.
-- **`aiSuggestions.service.ts`** — a thin wrapper over the configured LLM provider with a fixed resume-coach system prompt, capped at 6 concrete suggestions per response. The resume is truncated to 8,000 characters before sending, since Groq's free tier allows ~6,000 tokens per minute and a full-length resume would consume a whole minute's budget alone.
-- **`services/llm/`** — a one-method `LlmProvider` interface with Groq and Gemini implementations, selected by `LLM_PROVIDER`. Each provider normalises its own SDK errors into a shared `LlmApiError`, so the controller maps status codes without knowing which SDK threw.
+- **`aiSuggestions.service.ts`** — sends resume text and the entered target role to Groq or Gemini, selected by `LLM_PROVIDER`. It limits resume text to 8,000 characters and requests up to 6 suggestions. Provider errors use the same response handling.
 
 ## Technical Challenges & Solutions
 
@@ -142,50 +141,49 @@ sequenceDiagram
 
 ## Project Structure
 
-```
+```text
 backend/
   src/
-    server.ts                   # Express app entry
-    config/env.ts               # env vars + defaults
-    routes/resume.routes.ts     # POST /api/resume/analyze, /api/resume/suggest
+    server.ts
+    config/env.ts
+    routes/resume.routes.ts
     controllers/
-      resume.controller.ts      # extract -> embed -> search -> rescore
-      suggestions.controller.ts # AI suggestions request handling
+      resume.controller.ts
+      suggestions.controller.ts
     services/
-      textExtraction.service.ts # PDF text / OCR extraction
-      embedding.service.ts      # local embedding model
-      milvus.service.ts         # Milvus collection + search
-      skillMatch.service.ts     # keyword skill-overlap scoring
-      aiSuggestions.service.ts  # prompt + truncation, delegates to llm/
-      llm/                      # LlmProvider interface + Groq and Gemini providers
+      textExtraction.service.ts
+      embedding.service.ts
+      milvus.service.ts
+      skillMatch.service.ts
+      aiSuggestions.service.ts
+      jobCatalog.ts
+      jobIdentity.ts
     scripts/
-      generateJobs.ts           # generates data/jobs.json (role templates)
-      fetchAdzunaJobs.ts        # appends real postings from the Adzuna API
-      seedJobs.ts               # embeds + inserts jobs into Milvus
-    data/jobs.json              # job descriptions used for seeding
-    types/index.ts              # JobDescription / JobMatch
+      generateJobs.ts
+      fetchAdzunaJobs.ts
+      deduplicateJobs.ts
+      seedJobs.ts
+    data/
+      jobs.json
+      jobTemplates.json
+    types/index.ts
+  test/
 frontend/
   app/
-    layout.tsx / page.tsx / globals.css
-    icon.tsx / apple-icon.tsx   # generated favicon + touch icon
+    page.tsx
+    layout.tsx
+    globals.css
+    icon.tsx
+    apple-icon.tsx
   components/
-    Sidebar.tsx                 # draggable/collapsible nav
-    UploadPanel.tsx             # drag-and-drop resume upload
-    ResultsPanel.tsx            # paginated job match grid
-    JobCard.tsx
-    JobDetailModal.tsx          # full posting, opened by clicking a card
-    ResumeSuggestions.tsx       # target-role input + AI suggestions
-    BackgroundGlow.tsx          # decorative glass backdrop
+    shell/
+    workspaces/
+    jobs/
+    ui/
     Logo.tsx
   lib/
-    api.ts                      # calls the backend
-    types.ts
-    scoreTier.ts                # match-score -> percent + styling
-    useJobActions.ts            # save/apply behaviour shared by card + modal
-    logoPath.ts                 # logo vector paths
-    cn.ts                       # classname helper
-  next.config.mjs               # proxies /api/* to the backend
-docker-compose.yml              # Milvus standalone stack
+  next.config.mjs
+docker-compose.yml
 ```
 
 ## API Documentation
@@ -248,7 +246,7 @@ Give it 30–60 seconds to become healthy the first time. Check with `docker ps`
 cd backend
 cp .env.example .env
 npm install
-npm run seed   # embeds and inserts the job descriptions into Milvus (one-time)
+npm run seed
 ```
 
 The repo ships with `backend/src/data/jobs.json` already populated with 9,725 unique sample job descriptions across software/tech, core engineering, and non-tech roles — so `npm run seed` has a large, varied pool to match resumes against out of the box.
@@ -266,9 +264,9 @@ To use Google Gemini instead, set `LLM_PROVIDER=gemini` and supply `GEMINI_API_K
 To regenerate the job pool or start over:
 
 ```bash
-npm run generate:jobs   # regenerates data/jobs.json with a fresh synthetic set
-npm run dedupe:jobs     # removes duplicate records from data/jobs.json, preserving retained IDs
-npm run seed:reset      # drops the existing Milvus collection and re-seeds it
+npm run generate:jobs
+npm run dedupe:jobs
+npm run seed:reset
 ```
 
 To import real postings with application links, set `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, and optionally `ADZUNA_COUNTRY` in `backend/.env`, then run `npm run fetch:adzuna` followed by `npm run seed:reset`. The importer retains the original posting URL, location, salary, and publication date. Restart the backend after updating the catalog: search results get source metadata from `jobs.json` by job ID, so existing Milvus collections need no schema migration.
@@ -299,16 +297,16 @@ Open `http://localhost:3000`, upload a resume, and see your matched jobs. The fr
 
 **UI tour:**
 
-- The **sidebar** is a real resizable panel — drag its right edge, or drag past a threshold and release to snap into an icon-only rail.
-- Upload a resume and the view transitions into a **results screen**, 20 matches per page, with Prev/Next and a jump-to-page control.
+- Use the sidebar to move between Resume, Matched jobs, and AI suggestions. On mobile, use the navigation menu.
+- Upload a resume without a target role or location. View ranked results, filter them, and use **Show more** to load another 25 jobs.
 - Jobs scoring **10% or below** are filtered out server-side, so you won't see irrelevant postings.
 - Select a **job card** to read its full description in the detail pane.
 - Each job has a **bookmark toggle** persisted in `localStorage`. **Apply** opens the original posting in a new tab so you can submit an application on the source site. When no original URL exists, **Find openings** searches LinkedIn; sample listings search by role alone because their companies are fictional. These actions are available in both the job list and detail pane.
-- The **"Improve your resume"** section asks what role you're targeting, then returns specific, role-tailored suggestions from the LLM — missing keywords, weak bullets, structural issues.
+- **AI suggestions** starts with an empty target-role field. Enter the role you want and select **Get suggestions** for resume improvements. Selecting a job does not fill this field.
 
 ## Testing
 
-Run the regression tests with `cd backend && npm test`. They cover skills, PDF text extraction, upload responses, application links and safe search fallbacks, catalog metadata, and duplicate detection. They do not require an API key, embedding download, or Milvus.
+Run the regression tests with `cd backend && npm test`. They cover skills, PDF text extraction, upload responses, application links and safe search fallbacks, catalog metadata, duplicate detection, both AI providers, and suggestion request validation. They do not require an API key, embedding download, or Milvus.
 
 Additional checks:
 

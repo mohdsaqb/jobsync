@@ -1,10 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-/**
- * Used for every "nothing here" case — no results, filtered out, missing
- * prerequisite. Always takes an action, so the state is never a dead end.
- */
 export function EmptyState({
   icon,
   title,

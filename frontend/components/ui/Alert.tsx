@@ -17,10 +17,6 @@ const TONES: Record<Tone, { wrap: string; icon: ReactNode }> = {
   error: { wrap: "border-red-100 bg-red-50 text-ink", icon: <XCircle className="h-4 w-4 text-danger" /> },
 };
 
-/**
- * Status is carried by an icon and the text as well as colour, so it reads
- * without relying on hue alone.
- */
 export function Alert({
   tone = "info",
   title,

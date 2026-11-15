@@ -3,166 +3,119 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppShell from "@/components/shell/AppShell";
 import JobsWorkspace from "@/components/workspaces/JobsWorkspace";
-import ResumeWorkspace, { type ResumeResult } from "@/components/workspaces/ResumeWorkspace";
+import ResumeWorkspace from "@/components/workspaces/ResumeWorkspace";
 import SuggestionsWorkspace from "@/components/workspaces/SuggestionsWorkspace";
-import { analyzeResume, getResumeSuggestions, type AnalyzeOptions } from "@/lib/api";
-import type { JobMatch } from "@/lib/types";
-import type { Workspace } from "@/lib/workspace";
+import { analyzeResume, getResumeSuggestions } from "@/lib/api";
+import type { AnalyzeResult, ResumeSuggestions } from "@/lib/types";
+import { WORKSPACE_LABELS, type Workspace } from "@/lib/workspace";
 
-const WORKSPACES: Workspace[] = ["resume", "jobs", "suggestions"];
-
-function workspaceFromHash(): Workspace | null {
-  if (typeof window === "undefined") return null;
-  const candidate = window.location.hash.replace("#", "") as Workspace;
-  return WORKSPACES.includes(candidate) ? candidate : null;
+function workspaceFromHash(): Workspace {
+  const hash = window.location.hash.slice(1);
+  return Object.keys(WORKSPACE_LABELS).includes(hash) ? hash as Workspace : "resume";
 }
 
 export default function Home() {
   const [workspace, setWorkspace] = useState<Workspace>("resume");
-
-  const [matches, setMatches] = useState<JobMatch[] | null>(null);
-  const [resumeText, setResumeText] = useState("");
-  const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
+  const [analysis, setAnalysis] = useState<AnalyzeResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-
-  const [suggestions, setSuggestions] = useState<{ text: string; forLabel: string } | null>(null);
-  const [generatingFor, setGeneratingFor] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<ResumeSuggestions | null>(null);
+  const [generating, setGenerating] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
+  const lastFile = useRef<File | null>(null);
 
-  const lastSubmission = useRef<{ file: File; hints: AnalyzeOptions } | null>(null);
-
-  /**
-   * The workspace lives in the URL hash so browser back/forward move between
-   * steps instead of leaving the app. A refresh keeps the hash but loses the
-   * in-memory results, which each workspace already handles with a
-   * "upload a resume first" state.
-   */
   const go = useCallback((next: Workspace) => {
     setWorkspace(next);
-    if (typeof window !== "undefined" && workspaceFromHash() !== next) {
-      window.history.pushState({ workspace: next }, "", `#${next}`);
-    }
+    if (workspaceFromHash() !== next) window.history.pushState(null, "", `#${next}`);
   }, []);
 
   useEffect(() => {
-    const fromHash = workspaceFromHash();
-    if (fromHash) setWorkspace(fromHash);
-
-    const onPopState = () => setWorkspace(workspaceFromHash() ?? "resume");
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    const syncWorkspace = () => setWorkspace(workspaceFromHash());
+    syncWorkspace();
+    window.addEventListener("popstate", syncWorkspace);
+    return () => window.removeEventListener("popstate", syncWorkspace);
   }, []);
 
-  const runAnalysis = useCallback(
-    async (file: File, hints: AnalyzeOptions) => {
-      lastSubmission.current = { file, hints };
-      setAnalyzing(true);
-      setAnalyzeError(null);
-      try {
-        const result = await analyzeResume(file, hints);
-        setMatches(result.matches);
-        setResumeText(result.resumeText);
-        setResumeResult({
-          matchCount: result.matches.length,
-          resumeSkills: result.resumeSkills,
-          resumeChars: result.resumeText.length,
-        });
-        // A new resume invalidates the previous selection and advice.
-        setSelectedJobId(null);
-        setSuggestions(null);
-        setSuggestError(null);
-      } catch (err) {
-        setAnalyzeError(err instanceof Error ? err.message : "Something went wrong.");
-      } finally {
-        setAnalyzing(false);
-      }
-    },
-    [],
-  );
+  async function runAnalysis(file: File) {
+    lastFile.current = file;
+    setAnalyzing(true);
+    setAnalyzeError(null);
+    try {
+      setAnalysis(await analyzeResume(file));
+      setSelectedJobId(null);
+      setSuggestions(null);
+      setSuggestError(null);
+    } catch (error) {
+      setAnalyzeError(error instanceof Error ? error.message : "Could not analyze your resume.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
-  const reset = useCallback(() => {
-    setMatches(null);
-    setResumeText("");
-    setResumeResult(null);
+  function reset() {
+    setAnalysis(null);
     setAnalyzeError(null);
     setSelectedJobId(null);
     setSuggestions(null);
     setSuggestError(null);
-    lastSubmission.current = null;
+    lastFile.current = null;
     go("resume");
-  }, [go]);
+  }
 
-  const generate = useCallback(
-    async (role: string) => {
-      const target = role.trim();
-      if (!target || !resumeText) return;
-
-      setGeneratingFor(target);
-      setSuggestError(null);
-      try {
-        const text = await getResumeSuggestions(resumeText, target);
-        setSuggestions({ text, forLabel: target });
-      } catch (err) {
-        setSuggestions(null);
-        setSuggestError(err instanceof Error ? err.message : "Something went wrong.");
-      } finally {
-        setGeneratingFor(null);
-      }
-    },
-    [resumeText],
-  );
-
-  const selectedJob = matches?.find((job) => job.jobId === selectedJobId) ?? null;
-  const hasResults = matches !== null;
+  async function generate(role: string) {
+    const targetRole = role.trim();
+    if (!targetRole || !analysis) return;
+    setGenerating(true);
+    setSuggestError(null);
+    try {
+      const text = await getResumeSuggestions(analysis.resumeText, targetRole);
+      setSuggestions({ text, targetRole });
+    } catch (error) {
+      setSuggestions(null);
+      setSuggestError(error instanceof Error ? error.message : "Could not generate suggestions.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   return (
     <AppShell
       current={workspace}
       onNavigate={go}
-      matchCount={matches?.length ?? null}
-      hasResults={hasResults}
+      matchCount={analysis?.matches.length ?? null}
+      hasResults={analysis !== null}
       busy={analyzing}
     >
       {workspace === "resume" && (
         <ResumeWorkspace
           loading={analyzing}
           error={analyzeError}
-          result={resumeResult}
+          result={analysis}
           onSubmit={runAnalysis}
           onContinue={() => go("jobs")}
           onReset={reset}
         />
       )}
-
       {workspace === "jobs" && (
         <JobsWorkspace
-          matches={matches}
+          matches={analysis?.matches ?? null}
           loading={analyzing}
           error={analyzeError}
           selectedJobId={selectedJobId}
           onSelectJob={setSelectedJobId}
           onGetSuggestions={() => go("suggestions")}
           onGoToResume={() => go("resume")}
-          onRetry={() => {
-            const last = lastSubmission.current;
-            if (last) void runAnalysis(last.file, last.hints);
-            else go("resume");
-          }}
+          onRetry={() => lastFile.current ? void runAnalysis(lastFile.current) : go("resume")}
         />
       )}
-
       {workspace === "suggestions" && (
         <SuggestionsWorkspace
-          job={selectedJob}
-          hasResults={hasResults}
+          hasResume={analysis !== null}
           suggestions={suggestions}
-          generatingFor={generatingFor}
+          loading={generating}
           error={suggestError}
           onGenerate={generate}
-          onGoToJobs={() => go("jobs")}
           onGoToResume={() => go("resume")}
         />
       )}

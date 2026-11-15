@@ -34,7 +34,6 @@ export default function JobsWorkspace({
   onGoToResume,
   onRetry,
 }: {
-  /** Null until an analysis has run. */
   matches: JobMatch[] | null;
   loading: boolean;
   error: string | null;
@@ -52,18 +51,13 @@ export default function JobsWorkspace({
   const locations = useMemo(() => locationOptions(matches ?? []), [matches]);
   const filtersActive = hasActiveFilters(filters);
 
-  // Only offer a filter the data can answer. The synthetic corpus carries no
-  // location, date or salary, and a control that always returns nothing reads
-  // as a broken app rather than an empty result.
   const canFilterLocation = locations.length > 0;
   const canFilterDate = useMemo(() => (matches ?? []).some((job) => (job.createdAt ?? 0) > 0), [matches]);
   const canFilterSalary = useMemo(
     () => (matches ?? []).some((job) => (job.salaryMin ?? 0) > 0 || (job.salaryMax ?? 0) > 0),
     [matches],
   );
-  const hasSecondaryFilters = canFilterDate || canFilterSalary;
 
-  // A narrowed list shouldn't keep the previous scroll depth.
   useEffect(() => setVisible(PAGE_SIZE), [filters, matches]);
 
   const selected = results.find((job) => job.jobId === selectedJobId) ?? null;

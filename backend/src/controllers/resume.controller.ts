@@ -10,7 +10,6 @@ import { extractResumeText, TextExtractionError } from "../services/textExtracti
 
 const MIN_MATCH_SCORE = 0.1;
 
-// Final score blends semantic fit with explicit skill overlap (see skillMatch.service.ts).
 const SEMANTIC_WEIGHT = 0.6;
 const SKILL_WEIGHT = 0.4;
 
@@ -33,7 +32,7 @@ export async function analyzeResume(req: Request, res: Response): Promise<void> 
       .map((match) => {
         const jobSkills = extractSkills(`${match.title} ${match.description}`);
         const overlap = skillOverlapScore(resumeSkills, jobSkills);
-        // Returned so the UI can explain a match rather than only show a number.
+
         const matchedSkills: string[] = [];
         const unmatchedSkills: string[] = [];
         for (const skill of jobSkills) {

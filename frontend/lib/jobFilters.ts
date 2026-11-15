@@ -28,11 +28,6 @@ export function hasActiveFilters(filters: JobFilters): boolean {
   );
 }
 
-/**
- * Filters and sorts the result set the API already returned. Every predicate
- * reads a field the backend actually sends — there is no client-side guessing
- * at work mode or seniority, which the data doesn't carry.
- */
 export function applyJobFilters(matches: JobMatch[], filters: JobFilters, now = Date.now()): JobMatch[] {
   const query = filters.query.trim().toLowerCase();
   const location = filters.location.trim().toLowerCase();
@@ -43,19 +38,18 @@ export function applyJobFilters(matches: JobMatch[], filters: JobFilters, now = 
     if (query && !`${job.title} ${job.company}`.toLowerCase().includes(query)) return false;
     if (location && !(job.location ?? "").toLowerCase().includes(location)) return false;
     if (filters.salaryOnly && !((job.salaryMin ?? 0) > 0 || (job.salaryMax ?? 0) > 0)) return false;
-    // A posting with no date can't satisfy a recency filter.
+
     if (cutoff !== null && (job.createdAt ?? 0) < cutoff) return false;
     return true;
   });
 
   if (filters.sort === "newest") {
-    return [...filtered].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return filtered.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
   }
-  // The API already returns match order; copying keeps it stable either way.
+
   return filtered;
 }
 
-/** Distinct locations present in the results, for the datalist suggestions. */
 export function locationOptions(matches: JobMatch[], limit = 40): string[] {
   const counts = new Map<string, number>();
   for (const job of matches) {

@@ -5,7 +5,6 @@ import { FileText, Image as ImageIcon, UploadCloud, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
-/** Mirrors the backend's multer allowlist and 5MB cap in resume.routes.ts. */
 export const ACCEPTED_EXTENSIONS = [".pdf", ".png", ".jpg", ".jpeg"];
 export const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 

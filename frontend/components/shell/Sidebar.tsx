@@ -8,7 +8,7 @@ import type { Workspace } from "@/lib/workspace";
 interface SidebarProps {
   current: Workspace;
   onNavigate: (workspace: Workspace) => void;
-  /** Number of matched roles, or null before an analysis has run. */
+
   matchCount: number | null;
   hasResults: boolean;
   onClose?: () => void;

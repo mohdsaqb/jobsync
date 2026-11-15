@@ -4,7 +4,6 @@ export function Skeleton({ className }: { className?: string }) {
   return <div aria-hidden="true" className={cn("animate-pulse rounded bg-slate-200/80", className)} />;
 }
 
-/** Placeholder matching the real job row's height, so the list doesn't jump. */
 export function JobCardSkeleton() {
   return (
     <div className="rounded-xl border border-hairline bg-surface p-4">

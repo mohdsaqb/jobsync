@@ -4,7 +4,6 @@ import { postingUrl } from "./jobIdentity.js";
 
 const catalog = new Map<string, JobDescription>(jobs.map((job) => [job.jobId, job]));
 
-/** Keep source metadata in the catalog so existing Milvus schemas still work. */
 export function withCatalogMetadata<T extends JobDescription>(job: T, source = catalog.get(job.jobId)): T {
   if (!source) return job;
   return {

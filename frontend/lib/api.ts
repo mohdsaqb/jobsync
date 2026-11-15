@@ -1,24 +1,8 @@
-import type { AnalyzeMeta, JobMatch } from "./types";
+import type { AnalyzeResult } from "./types";
 
-interface AnalyzeResumeResult {
-  matches: JobMatch[];
-  resumeText: string;
-  /** Null when an older backend did not return skill detection results. */
-  resumeSkills: string[] | null;
-  meta?: AnalyzeMeta;
-}
-
-export interface AnalyzeOptions {
-  /** Optional hints that let the backend pull in fresh postings for this role. */
-  targetRole?: string;
-  location?: string;
-}
-
-export async function analyzeResume(file: File, options: AnalyzeOptions = {}): Promise<AnalyzeResumeResult> {
+export async function analyzeResume(file: File): Promise<AnalyzeResult> {
   const formData = new FormData();
   formData.append("resume", file);
-  if (options.targetRole?.trim()) formData.append("targetRole", options.targetRole.trim());
-  if (options.location?.trim()) formData.append("location", options.location.trim());
 
   const response = await fetch("/api/resume/analyze", {
     method: "POST",
@@ -32,10 +16,9 @@ export async function analyzeResume(file: File, options: AnalyzeOptions = {}): P
   }
 
   return {
-    matches: body.matches as JobMatch[],
-    resumeText: body.resumeText as string,
+    matches: body.matches,
+    resumeText: body.resumeText,
     resumeSkills: Array.isArray(body.resumeSkills) ? body.resumeSkills as string[] : null,
-    meta: body.meta as AnalyzeMeta | undefined,
   };
 }
 

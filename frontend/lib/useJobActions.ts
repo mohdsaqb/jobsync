@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 
 const savedKey = (jobId: string) => `resume-analyser:saved:${jobId}`;
 
-// Bookmark behaviour shared by the job list and detail pane.
 export function useJobActions(jobId: string | null | undefined) {
   const [saved, setSaved] = useState(false);
 

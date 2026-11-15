@@ -105,7 +105,6 @@ export default function JobDetail({ job, onGetSuggestions }: { job: JobMatch; on
   );
 }
 
-/** Shown in the right pane before anything is selected. */
 export function JobDetailPlaceholder({ className }: { className?: string }) {
   return (
     <div className={cn("flex h-full items-center justify-center px-6 text-center", className)}>

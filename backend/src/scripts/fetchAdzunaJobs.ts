@@ -5,26 +5,14 @@ import "dotenv/config";
 import type { JobDescription } from "../types/index.js";
 import { deduplicateJobs, postingUrl } from "../services/jobIdentity.js";
 
-/**
- * Pulls real job postings from the Adzuna API (https://developer.adzuna.com/)
- * and appends them to data/jobs.json, alongside the existing synthetic set.
- * Run with `npm run fetch:adzuna`, then `npm run seed:reset` to push the
- * updated dataset into Milvus.
- *
- * Requires ADZUNA_APP_ID and ADZUNA_APP_KEY in backend/.env — sign up free
- * at https://developer.adzuna.com/ (instant approval, no cost).
- */
-
 const APP_ID = process.env.ADZUNA_APP_ID;
 const APP_KEY = process.env.ADZUNA_APP_KEY;
 const COUNTRY = process.env.ADZUNA_COUNTRY ?? "us";
 const RESULTS_PER_PAGE = 50;
 const PAGES_PER_QUERY = Number(process.env.ADZUNA_PAGES_PER_QUERY ?? 2);
-// Adzuna's free tier is rate-limited; this keeps requests well under it.
+
 const DELAY_MS = 1100;
 
-// Mirrors the role categories already in generateJobs.ts so the real
-// postings broaden the same spread rather than skewing it.
 const QUERIES = [
   "software engineer", "frontend developer", "backend developer", "full stack engineer",
   "MERN stack developer", "MEAN stack developer", "react developer", "node.js developer",
@@ -127,7 +115,6 @@ async function main() {
 
   console.log(`\nFetched ${collected.length} real job postings from Adzuna.`);
 
-  // Fresh records come first so repeat imports also refresh application links.
   const merged = deduplicateJobs([...collected, ...existing]);
   await fs.writeFile(dataPath, `${JSON.stringify(merged, null, 2)}\n`);
   console.log(

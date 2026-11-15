@@ -20,7 +20,7 @@ const SIZES: Record<Size, string> = {
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
-  /** Shows a spinner and blocks interaction without changing the label's width. */
+
   loading?: boolean;
   icon?: ReactNode;
 }
@@ -66,7 +66,6 @@ export function Spinner({ className }: { className?: string }) {
   );
 }
 
-/** Anchor styled as a button, for links that genuinely navigate away. */
 export function LinkButton({
   href,
   variant = "primary",

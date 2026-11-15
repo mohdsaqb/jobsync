@@ -47,7 +47,7 @@ export default function JobListItem({
               <span className="block truncate text-sm font-semibold text-ink">{job.title}</span>
               <span className="mt-0.5 block truncate text-[13px] text-muted">{job.company}</span>
             </span>
-            {/* Padded so the bookmark button never overlaps the score. */}
+
             <span className="shrink-0 pr-7">
               <Badge tone={tier.tone}>{matchPercent(job.score)}%</Badge>
             </span>
@@ -100,7 +100,6 @@ export default function JobListItem({
         aria-pressed={saved}
         className={cn(
           "absolute right-3 top-3 rounded-md p-1.5 transition-colors",
-          // slate-500 clears the 3:1 minimum for interactive controls; slate-300 did not.
           saved ? "text-amber-600" : "text-slate-500 hover:bg-white hover:text-ink",
         )}
       >
